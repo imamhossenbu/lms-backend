@@ -67,6 +67,12 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    return { token: this.jwt.sign({ sub: user.id, email: user.email }) };
+    return {
+      token: this.jwt.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+      }),
+    };
   }
 }
