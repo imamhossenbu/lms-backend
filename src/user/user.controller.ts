@@ -53,11 +53,6 @@ export class UserController {
     return this.userService.changeUserRole(body.userId, body.role);
   }
 
-  @Patch("teacher/action")
-  @Roles("ADMIN", "TEACHER")
-  async teacherAction() {
-    return { message: "Action performed by authorized personnel" };
-  }
 
   @Get("all")
   @Roles("ADMIN")
@@ -65,17 +60,13 @@ export class UserController {
     return await this.userService.findAll();
   }
 
-  @Patch("admin/block")
+  @Patch("admin/change-status")
   @Roles("ADMIN")
   async blockUser(@Body() body: { userId: string; status: string }) {
     return await this.userService.toggleBlockStatus(body.userId, body.status);
   }
 
-  @Patch("admin/approve/:id")
-  @Roles("ADMIN")
-  async approveUser(@Param("id") id: string) {
-    return await this.userService.toggleBlockStatus(id, "ACTIVE");
-  }
+
 
   @Delete("admin/:id")
   @Roles("ADMIN")
