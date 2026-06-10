@@ -4,8 +4,8 @@ import {
   IsNumber,
   IsBoolean,
   IsOptional,
-  IsDecimal,
 } from "class-validator";
+import { PartialType } from "@nestjs/mapped-types";
 
 export class CreateCourseDto {
   @IsString() @IsNotEmpty() title!: string;
@@ -22,3 +22,5 @@ export class CreateCourseDto {
   @IsOptional() learningOutcomes?: string;
   @IsOptional() tags?: string;
 }
+
+export class UpdateCourseDto extends PartialType(CreateCourseDto) {}
