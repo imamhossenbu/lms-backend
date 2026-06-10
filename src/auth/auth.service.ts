@@ -24,12 +24,11 @@ export class AuthService {
         ...dto,
         password: hashedPassword,
         verificationToken: token,
-        role: "STUDENT", 
+        role: "STUDENT",
         status: "PENDING",
       },
     });
   }
-
 
   async verifyEmail(token: string) {
     const user = await this.prisma.user.findUnique({
@@ -44,7 +43,7 @@ export class AuthService {
       where: { id: user.id },
       data: {
         emailVerified: true,
-        verificationToken: null, 
+        verificationToken: null,
         status: "ACTIVE",
       },
     });
@@ -62,6 +61,11 @@ export class AuthService {
     if (!user.emailVerified) {
       throw new UnauthorizedException("Please verify your email first");
     }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     return { token: this.jwt.sign({ sub: user.id, email: user.email }) };
   }
