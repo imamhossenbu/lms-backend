@@ -40,29 +40,34 @@ export class CourseController {
     return this.courseService.findAll();
   }
 
+  @Get(":id")
+  async getOne(@Param("id") id: string) {
+    return this.courseService.findOne(id);
+  }
 
-  @Get(':id')
-async getOne(@Param('id') id: string) {
-  return this.courseService.findOne(id);
-}
+  @Patch(":id")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  @UseInterceptors(FileInterceptor("thumbnail"))
+  async update(
+    @Param("id") id: string,
+    @Body() dto: UpdateCourseDto,
+    @Req() req: RequestWithUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.courseService.update(
+      id,
+      req.user.userId,
+      req.user.role,
+      dto,
+      file,
+    );
+  }
 
-@Patch(':id')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('ADMIN', 'TEACHER')
-@UseInterceptors(FileInterceptor('thumbnail'))
-async update(
-  @Param('id') id: string,
-  @Body() dto: UpdateCourseDto,
-  @Req() req: RequestWithUser,
-  @UploadedFile() file: Express.Multer.File
-) {
-  return this.courseService.update(id, req.user.userId, req.user.role, dto, file);
-}
-
-@Delete(':id')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('ADMIN', 'TEACHER')
-async delete(@Param('id') id: string, @Req() req: RequestWithUser) {
-  return this.courseService.delete(id);
-}
+  @Delete(":id")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  async delete(@Param("id") id: string, @Req() req: RequestWithUser) {
+    return this.courseService.delete(id);
+  }
 }
