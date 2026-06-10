@@ -71,6 +71,12 @@ export class UserController {
     return await this.userService.toggleBlockStatus(body.userId, body.status);
   }
 
+  @Patch("admin/approve/:id")
+  @Roles("ADMIN")
+  async approveUser(@Param("id") id: string) {
+    return await this.userService.toggleBlockStatus(id, "ACTIVE");
+  }
+
   @Delete("admin/:id")
   @Roles("ADMIN")
   async deleteUser(@Param("id") id: string) {

@@ -46,16 +46,13 @@ export class AuthService {
       where: { verificationToken: token },
     });
 
-    if (!user) {
-      throw new NotFoundException("Invalid verification token");
-    }
+    if (!user) throw new NotFoundException("Invalid verification token");
 
     return await this.prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerified: true,
         verificationToken: null,
-        status: "ACTIVE",
       },
     });
   }
@@ -69,14 +66,20 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
-    if (user.status === "BLOCKED") {
+   
+    if (!user.emailVerified) {
+      throw new UnauthorizedException("Please verify your email first");
+    }
+
+
+    if (user.status === "PENDING") {
       throw new UnauthorizedException(
-        "Your account has been blocked by the administrator",
+        "Your account is waiting for admin approval",
       );
     }
 
-    if (!user.emailVerified) {
-      throw new UnauthorizedException("Please verify your email first");
+    if (user.status === "BLOCKED") {
+      throw new UnauthorizedException("Your account has been blocked");
     }
 
     await this.prisma.user.update({
