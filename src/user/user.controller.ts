@@ -7,6 +7,8 @@ import {
   Req,
   UseInterceptors,
   UploadedFile,
+  Delete,
+  Param,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -28,9 +30,6 @@ export class UserController {
   async getMe(@Req() req: RequestWithUser) {
     return this.userService.findOne(req.user.userId);
   }
-
-
-
 
   @Patch("profile")
   @UseInterceptors(FileInterceptor("avatar"))
@@ -58,5 +57,23 @@ export class UserController {
   @Roles("ADMIN", "TEACHER")
   async teacherAction() {
     return { message: "Action performed by authorized personnel" };
+  }
+
+  @Get("all")
+  @Roles("ADMIN")
+  async getAllUsers() {
+    return await this.userService.findAll();
+  }
+
+  @Patch("admin/block")
+  @Roles("ADMIN")
+  async blockUser(@Body() body: { userId: string; status: string }) {
+    return await this.userService.toggleBlockStatus(body.userId, body.status);
+  }
+
+  @Delete("admin/:id")
+  @Roles("ADMIN")
+  async deleteUser(@Param("id") id: string) {
+    return await this.userService.deleteUser(id);
   }
 }

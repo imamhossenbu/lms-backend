@@ -25,4 +25,21 @@ export class UserService {
   async changeUserRole(id: string, role: string) {
     return this.prisma.user.update({ where: { id }, data: { role } });
   }
+
+  async findAll() {
+    return await this.prisma.user.findMany();
+  }
+
+  async toggleBlockStatus(id: string, status: string) {
+    return await this.prisma.user.update({
+      where: { id },
+      data: { status },
+    });
+  }
+
+  async deleteUser(id: string) {
+    return await this.prisma.user.delete({
+      where: { id },
+    });
+  }
 }

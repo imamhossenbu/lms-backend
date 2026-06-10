@@ -69,6 +69,12 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    if (user.status === "BLOCKED") {
+      throw new UnauthorizedException(
+        "Your account has been blocked by the administrator",
+      );
+    }
+
     if (!user.emailVerified) {
       throw new UnauthorizedException("Please verify your email first");
     }
