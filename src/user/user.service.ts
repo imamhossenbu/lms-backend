@@ -1,6 +1,6 @@
 // src/user/user.service.ts
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class UserService {
@@ -11,19 +11,16 @@ export class UserService {
   }
 
   async updateProfile(userId: string, data: any, avatarUrl?: string) {
-  const updateData: any = { ...data };
-  if (avatarUrl) updateData.avatar = avatarUrl;
+    const updatePayload = { ...data };
+    if (avatarUrl) {
+      updatePayload.avatar = avatarUrl;
+    }
 
-
-  return await this.prisma.$transaction([
-    this.prisma.user.update({ where: { id: userId }, data: { avatar: avatarUrl, name: data.name } }),
-    this.prisma.userProfile.upsert({
-      where: { userId },
-      update: data,
-      create: { userId, ...data },
-    }),
-  ]);
-}
+    return await this.prisma.user.update({
+      where: { id: userId },
+      data: updatePayload,
+    });
+  }
 
   async changeUserRole(id: string, role: string) {
     return this.prisma.user.update({ where: { id }, data: { role } });

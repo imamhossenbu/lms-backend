@@ -31,9 +31,9 @@ export class UserController {
 
 
 
-  
+
   @Patch("profile")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("avatar"))
   async updateProfile(
     @Req() req: RequestWithUser,
     @Body() data: any,
