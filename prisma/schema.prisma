@@ -380,7 +380,6 @@ model Order {
   userId         String
   courseId       String
   
-  // রিলেশন যোগ করুন (এটিই আপনাকে include ব্যবহার করতে সাহায্য করবে)
   course         Course   @relation(fields: [courseId], references: [id])
   
   amount         Decimal

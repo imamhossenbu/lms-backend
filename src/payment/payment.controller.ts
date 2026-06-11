@@ -4,14 +4,14 @@ import { PaymentService } from "./payment.service";
 import { AuthGuard } from "@nestjs/passport";
 
 @Controller("payments")
-@UseGuards(AuthGuard("jwt"))
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
+  @UseGuards(AuthGuard("jwt"))
   @Post("initiate")
   async initiate(@Req() req: Request, @Body("orderId") orderId: string) {
     return await this.paymentService.initiatePayment(
-      (req as any).user.id,
+      (req as any).user.userId,
       orderId,
     );
   }

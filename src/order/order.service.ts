@@ -19,7 +19,7 @@ export class OrderService {
     return await this.prisma.order.create({
       data: {
         orderNumber: `ORD-${Date.now()}`,
-        userId,
+        userId: userId,
         courseId: dto.courseId,
         amount: course.price,
         discountAmount: 0,
