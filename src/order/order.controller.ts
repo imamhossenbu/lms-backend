@@ -6,25 +6,55 @@ import {
   UseGuards,
   Get,
   Param,
+  Patch,
 } from "@nestjs/common";
 import { Request } from "express";
 import { OrderService } from "./order.service";
 import { CreateOrderDto } from "./dto/order.dto";
-import { AuthGuard } from "@nestjs/passport"; 
+import { AuthGuard } from "@nestjs/passport";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
 
 @Controller("orders")
-@UseGuards(AuthGuard("jwt"))
+@UseGuards(AuthGuard("jwt"), RolesGuard)
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+
   @Post()
+  @Roles("STUDENT", "ADMIN")
   async create(@Req() req: Request, @Body() dto: CreateOrderDto) {
-    const userId = (req.user as any).id;
-    return await this.orderService.create(userId, dto);
+    const user = req.user as any;
+    return await this.orderService.create(user.id, dto);
   }
 
+ 
+  @Get("all")
+  @Roles("ADMIN")
+  async findAll() {
+    return await this.orderService.findAll();
+  }
+
+
+  @Get("my-orders")
+  @Roles("STUDENT", "ADMIN")
+  async findMyOrders(@Req() req: Request) {
+    const user = req.user as any;
+    return await this.orderService.findByStudent(user.id);
+  }
+
+
   @Get(":id")
-  async getOrder(@Param("id") id: string) {
-    return await this.orderService.findOne(id);
+  @Roles("STUDENT", "ADMIN")
+  async getOrder(@Req() req: Request, @Param("id") id: string) {
+    const user = req.user as any;
+    return await this.orderService.findOne(id, user.id, user.role);
+  }
+
+ 
+  @Patch(":id/status")
+  @Roles("ADMIN")
+  async updateStatus(@Param("id") id: string, @Body("status") status: string) {
+    return await this.orderService.updateStatus(id, status);
   }
 }

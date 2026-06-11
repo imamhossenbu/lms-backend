@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateOrderDto } from "./dto/order.dto";
 
@@ -11,6 +15,7 @@ export class OrderService {
       where: { id: dto.courseId },
     });
     if (!course) throw new NotFoundException("Course not found");
+
     return await this.prisma.order.create({
       data: {
         orderNumber: `ORD-${Date.now()}`,
@@ -27,9 +32,27 @@ export class OrderService {
     });
   }
 
-  async findOne(id: string) {
+  async findAll() {
+    return await this.prisma.order.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findByStudent(userId: string) {
+    return await this.prisma.order.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findOne(id: string, userId: string, role: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException("Order not found");
+
+    if (role !== "ADMIN" && order.userId !== userId) {
+      throw new ForbiddenException("You do not have access to this order");
+    }
+
     return order;
   }
 
