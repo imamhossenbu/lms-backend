@@ -88,26 +88,12 @@ export class PaymentService {
       };
     }
 
-    // CREATE PAYMENT METHOD
-    const paymentMethod = await this.prisma.paymentMethod.create({
-      data: {
-        userId: order.userId,
-        provider: "SSLCOMMERZ",
-        methodType: "ONLINE",
-        customerId: transactionId,
-        lastFour: transactionId.slice(-4),
-        isDefault: true,
-      },
-    });
-
     // CREATE PAYMENT
     const payment = await this.prisma.payment.create({
       data: {
         orderId,
         userId: order.userId,
         courseId: order.courseId,
-
-        paymentMethodId: paymentMethod.id,
 
         provider: "SSLCOMMERZ",
         providerTransactionId: transactionId,

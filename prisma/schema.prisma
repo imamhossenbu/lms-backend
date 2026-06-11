@@ -363,16 +363,7 @@ model CouponUsage {
   usedAt         DateTime @default(now())
 }
 
-model PaymentMethod {
-  id         String   @id @default(uuid())
-  userId     String
-  provider   String
-  methodType String
-  customerId String
-  lastFour   String
-  isDefault  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-}
+
 
 model Order {
   id             String   @id @default(uuid())
@@ -398,7 +389,6 @@ model Payment {
   orderId            String
   userId             String
   courseId           String
-  paymentMethodId    String
   provider           String
   providerTransactionId String
   amount             Decimal
