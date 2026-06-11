@@ -78,12 +78,16 @@ model CourseModule {
   order       Int
   isLocked    Boolean  @default(true)
   createdAt   DateTime @default(now())
+
+  lessons     Lesson[] 
 }
 
 model Lesson {
   id              String           @id @default(uuid())
   courseId        String
   moduleId        String
+  module          CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
   title           String
   type            String
   content         String?
@@ -95,7 +99,6 @@ model Lesson {
   status          String
   lessonResources LessonResource[]
 }
-
 model LessonResource {
   id          String @id @default(uuid())
   lessonId    String

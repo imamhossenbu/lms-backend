@@ -68,6 +68,6 @@ export class CourseController {
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
   async delete(@Param("id") id: string, @Req() req: RequestWithUser) {
-    return this.courseService.delete(id);
+    return this.courseService.delete(id, req.user.userId, req.user.role);
   }
 }

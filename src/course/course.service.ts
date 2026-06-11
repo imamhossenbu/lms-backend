@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
@@ -26,6 +30,8 @@ export class CourseService {
         instructorId,
         thumbnail: thumbnailUrl,
         status: "DRAFT",
+        price: Number(dto.price),
+        durationMinutes: Number(dto.durationMinutes),
       },
     });
   }
@@ -44,6 +50,26 @@ export class CourseService {
     });
   }
 
+//   async findOne(id: string) {
+//   return await this.prisma.course.findUnique({
+//     where: { id },
+//     include: {
+//       category: true,
+//       modules: {
+//         orderBy: { order: 'asc' },
+//         include: {
+//           lessons: {
+//             orderBy: { order: 'asc' },
+//             include: {
+//               lessonResources: true, 
+//             },
+//           },
+//         },
+//       },
+//     },
+//   });
+// }
+
   async update(
     id: string,
     instructorId: string,
@@ -53,7 +79,6 @@ export class CourseService {
   ) {
     const course = await this.prisma.course.findUnique({ where: { id } });
 
-  
     if (!course) throw new NotFoundException("Course not found");
     if (role !== "ADMIN" && course.instructorId !== instructorId) {
       throw new ForbiddenException(
@@ -68,13 +93,29 @@ export class CourseService {
 
     return await this.prisma.course.update({
       where: { id },
-      data: { ...dto, ...(thumbnailUrl && { thumbnail: thumbnailUrl }) },
+      data: {
+        ...dto,
+
+        ...(dto.price && { price: Number(dto.price) }),
+        ...(dto.durationMinutes && {
+          durationMinutes: Number(dto.durationMinutes),
+        }),
+        ...(thumbnailUrl && { thumbnail: thumbnailUrl }),
+      },
     });
   }
 
-  async delete(id: string) {
-    return await this.prisma.course.delete({
-      where: { id },
-    });
+  async delete(id: string, instructorId: string, role: string) {
+    const course = await this.prisma.course.findUnique({ where: { id } });
+
+    if (!course) throw new NotFoundException("Course not found");
+
+    if (role !== "ADMIN" && course.instructorId !== instructorId) {
+      throw new ForbiddenException(
+        "You are not authorized to delete this course",
+      );
+    }
+
+    return await this.prisma.course.delete({ where: { id } });
   }
 }
