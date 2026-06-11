@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Req as NestReq,
 } from "@nestjs/common";
 import { LessonService } from "./lesson.service";
 import { CreateLessonDto, UpdateLessonDto } from "./dto/lesson.dto";
@@ -45,4 +46,18 @@ export class LessonController {
   async delete(@Param("id") id: string) {
     return this.lessonService.delete(id);
   }
+
+  @Post(":id/complete")
+  @Roles("STUDENT", "ADMIN")
+  async complete(@Req() req: any, @Param("id") lessonId: string) {
+    const userId = req.user.userId;
+    return await this.lessonService.completeLesson(userId, lessonId);
+  }
+}
+function Req(): (
+  target: LessonController,
+  propertyKey: "complete",
+  parameterIndex: 0,
+) => void {
+  return NestReq();
 }

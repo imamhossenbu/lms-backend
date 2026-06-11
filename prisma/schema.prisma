@@ -121,6 +121,7 @@ model Enrollment {
   status            String
   progressPercentage Int      @default(0)
   completedAt       DateTime?
+  lastAccessedAt    DateTime?
 }
 
 // --- Assessments ---
@@ -130,9 +131,12 @@ model LessonProgress {
   courseId       String
   lessonId       String
   isCompleted    Boolean   @default(false)
-  watchedSeconds Int
-  lastPosition   Int
+  watchedSeconds Int       @default(0) 
+  lastPosition   Int       @default(0) 
   completedAt    DateTime?
+
+ 
+  @@unique([userId, lessonId]) 
 }
 
 model Quiz {

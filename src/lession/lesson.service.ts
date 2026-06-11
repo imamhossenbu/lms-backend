@@ -1,13 +1,19 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateLessonDto, UpdateLessonDto } from "./dto/lesson.dto";
 import { DurationService } from "../Duration/duration.service";
+import { EnrollmentService } from "../enrollment/enrollment.service";
 
 @Injectable()
 export class LessonService {
   constructor(
     private prisma: PrismaService,
     private durationService: DurationService,
+    private enrollmentService: EnrollmentService,
   ) {}
 
   async create(courseId: string, moduleId: string, dto: CreateLessonDto) {
@@ -15,7 +21,6 @@ export class LessonService {
       data: { ...dto, courseId, moduleId, status: dto.status || "DRAFT" },
     });
 
-    // লেসন তৈরির পর ডিউরেশন আপডেট করুন
     await this.durationService.updateDurations(courseId, moduleId);
     return lesson;
   }
@@ -54,5 +59,41 @@ export class LessonService {
       lesson.moduleId,
     );
     return deletedLesson;
+  }
+
+  async completeLesson(userId: string, lessonId: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
+    if (!lesson) throw new NotFoundException("Lesson not found");
+
+    const hasAccess = await this.enrollmentService.hasAccess(
+      userId,
+      lesson.courseId,
+    );
+    if (!hasAccess) {
+      throw new ForbiddenException(
+        "You must be enrolled to complete this lesson",
+      );
+    }
+
+    await this.prisma.lessonProgress.upsert({
+      where: { userId_lessonId: { userId, lessonId } },
+      update: { isCompleted: true, completedAt: new Date() },
+      create: {
+        userId,
+        lessonId,
+        courseId: lesson.courseId,
+        isCompleted: true,
+        completedAt: new Date(),
+        watchedSeconds: 0,
+        lastPosition: 0,
+      },
+    });
+
+    return await this.enrollmentService.calculateAndSaveProgress(
+      userId,
+      lesson.courseId,
+    );
   }
 }
