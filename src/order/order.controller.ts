@@ -24,7 +24,6 @@ export class OrderController {
   @Roles("STUDENT", "ADMIN")
   async create(@Req() req: Request, @Body() dto: CreateOrderDto) {
     const user = req.user as any;
-    console.log("LOGGING USER ID:", user.userId);
 
     if (!user.userId) {
       throw new Error("User ID is missing from the token!");
