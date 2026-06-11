@@ -78,6 +78,7 @@ model CourseModule {
   order       Int
   isLocked    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  durationMinutes Int      @default(0)
 
   lessons     Lesson[] 
 }
