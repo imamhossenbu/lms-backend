@@ -7,6 +7,8 @@ import { Module } from "@nestjs/common";
 import { CategoryModule } from "./category/category.module";
 import { CourseModule } from "./course/course.module";
 import { CourseModuleModule } from "./course-module/course-module.module";
+import { LessonResourceModule } from "./lession-resource/lesson-resource.module";
+import { LessonModule } from "./lession/lesson.module";
 
 @Module({
   imports: [
@@ -16,7 +18,9 @@ import { CourseModuleModule } from "./course-module/course-module.module";
     UserModule,
     CategoryModule,
     CourseModule,
-    CourseModuleModule
+    CourseModuleModule,
+    LessonModule,
+    LessonResourceModule
   ],
 })
 export class AppModule {}
