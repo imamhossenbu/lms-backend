@@ -66,6 +66,8 @@ model Course {
   tags            String?
   ratingAverage   Decimal        @default(0)
   totalStudents   Int            @default(0)
+
+  orders          Order[]
   modules         CourseModule[]
 }
 
@@ -377,6 +379,10 @@ model Order {
   orderNumber    String   @unique
   userId         String
   courseId       String
+  
+  // রিলেশন যোগ করুন (এটিই আপনাকে include ব্যবহার করতে সাহায্য করবে)
+  course         Course   @relation(fields: [courseId], references: [id])
+  
   amount         Decimal
   discountAmount Decimal
   taxAmount      Decimal
