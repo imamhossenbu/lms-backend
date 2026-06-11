@@ -30,4 +30,29 @@ export class CloudinaryService {
         .end(file.buffer);
     });
   }
+
+
+  async uploadFile(
+    file: Express.Multer.File,
+    folder: string = "resources",
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            folder: folder,
+            resource_type: "raw", 
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            if (result && result.secure_url) {
+              resolve(result.secure_url);
+            } else {
+              reject(new Error("Cloudinary upload failed: No secure_url returned."));
+            }
+          },
+        )
+        .end(file.buffer);
+    });
+  }
 }

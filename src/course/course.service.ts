@@ -45,30 +45,20 @@ export class CourseService {
       where: { id },
       include: {
         category: true,
-        modules: true,
+        modules: {
+          orderBy: { order: "asc" },
+          include: {
+            lessons: {
+              orderBy: { order: "asc" },
+              include: {
+                lessonResources: true,
+              },
+            },
+          },
+        },
       },
     });
   }
-
-//   async findOne(id: string) {
-//   return await this.prisma.course.findUnique({
-//     where: { id },
-//     include: {
-//       category: true,
-//       modules: {
-//         orderBy: { order: 'asc' },
-//         include: {
-//           lessons: {
-//             orderBy: { order: 'asc' },
-//             include: {
-//               lessonResources: true, 
-//             },
-//           },
-//         },
-//       },
-//     },
-//   });
-// }
 
   async update(
     id: string,

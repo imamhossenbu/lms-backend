@@ -2,11 +2,15 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Delete,
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { LessonResourceService } from "./lesson-resource.service";
 import { CreateLessonResourceDto } from "./dto/resource.dto";
 import { AuthGuard } from "@nestjs/passport";
@@ -20,16 +24,29 @@ export class LessonResourceController {
 
   @Post()
   @Roles("ADMIN", "TEACHER")
+  @UseInterceptors(FileInterceptor("file"))
   async create(
     @Param("lessonId") lessonId: string,
     @Body() dto: CreateLessonResourceDto,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.resourceService.create(lessonId, dto);
+    return this.resourceService.create(lessonId, dto, file);
   }
 
   @Get()
   async findAll(@Param("lessonId") lessonId: string) {
     return this.resourceService.findAllByLesson(lessonId);
+  }
+
+  @Patch(":id")
+  @Roles("ADMIN", "TEACHER")
+  @UseInterceptors(FileInterceptor("file"))
+  async update(
+    @Param("id") id: string,
+    @Body() dto: Partial<CreateLessonResourceDto>,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.resourceService.update(id, dto, file);
   }
 
   @Delete(":id")
