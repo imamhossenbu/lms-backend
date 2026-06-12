@@ -7,6 +7,8 @@ import { AuthGuard } from "@nestjs/passport";
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
+
+  // Initiate payment and get the SSLCommerz gateway URL
   @UseGuards(AuthGuard("jwt"))
   @Post("initiate")
   async initiate(@Req() req: Request, @Body("orderId") orderId: string) {
@@ -16,6 +18,8 @@ export class PaymentController {
     );
   }
 
+
+// Handle payment success callback from SSLCommerz
   @Post("success/:orderId")
   async handleSuccess(@Param("orderId") orderId: string, @Body() body: any) {
     return await this.paymentService.recordPayment(orderId, body.val_id, body);

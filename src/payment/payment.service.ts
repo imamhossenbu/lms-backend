@@ -11,6 +11,8 @@ export class PaymentService {
     private enrollmentService: EnrollmentService,
   ) {}
 
+
+  // Initiate payment and get the SSLCommerz gateway URL
   async initiatePayment(userId: string, orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -73,6 +75,8 @@ export class PaymentService {
     }
   }
 
+
+  // Record payment details and enroll the user in the course
   async recordPayment(
     orderId: string,
     transactionId: string,
