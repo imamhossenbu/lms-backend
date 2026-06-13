@@ -11,6 +11,7 @@ import { LessonResourceModule } from "./lession-resource/lesson-resource.module"
 import { LessonModule } from "./lession/lesson.module";
 import { OrderModule } from "./order/order.module";
 import { PaymentModule } from "./payment/payment.module";
+import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { PaymentModule } from "./payment/payment.module";
     LessonResourceModule,
     OrderModule,
     PaymentModule,
+    LessonProgressModule,
   ],
 })
 export class AppModule {}

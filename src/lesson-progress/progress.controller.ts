@@ -1,4 +1,4 @@
-// src/lesson-progress/progress.controller.ts
+
 import { Controller, Patch, Param, Body, UseGuards, Req } from "@nestjs/common";
 import { LessonProgressService } from "./lesson-progress.service";
 import { AuthGuard } from "@nestjs/passport";

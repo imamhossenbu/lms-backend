@@ -1,4 +1,4 @@
-// src/lesson-progress/lesson-progress.module.ts
+
 import { Module } from "@nestjs/common";
 
 import { PrismaModule } from "../prisma/prisma.module";
