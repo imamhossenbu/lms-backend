@@ -9,6 +9,8 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { LessonResourceService } from "./lesson-resource.service";
@@ -28,7 +30,12 @@ export class LessonResourceController {
   async create(
     @Param("lessonId") lessonId: string,
     @Body() dto: CreateLessonResourceDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 50 })],
+      }),
+    )
+    file: Express.Multer.File,
   ) {
     return this.resourceService.create(lessonId, dto, file);
   }
@@ -37,7 +44,6 @@ export class LessonResourceController {
   async findAll(@Param("lessonId") lessonId: string) {
     return this.resourceService.findAllByLesson(lessonId);
   }
-
   @Patch(":id")
   @Roles("ADMIN", "TEACHER")
   @UseInterceptors(FileInterceptor("file"))
