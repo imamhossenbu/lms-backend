@@ -156,7 +156,7 @@ model QuizQuestion {
   quizId         String
   questionText   String
   questionType   String
-  options        String // JSON string
+  options        String 
   correctAnswer  String
   marks          Int
   explanation    String?

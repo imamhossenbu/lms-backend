@@ -1,4 +1,3 @@
-
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { EnrollmentService } from "../enrollment/enrollment.service";
@@ -22,7 +21,7 @@ export class LessonProgressService {
 
     const isCompleted = watchedMinutes >= lesson.durationMinutes;
 
-    await this.prisma.lessonProgress.upsert({
+    const progress = await this.prisma.lessonProgress.upsert({
       where: { userId_lessonId: { userId, lessonId } },
       update: {
         watchedSeconds: watchedMinutes,
@@ -39,10 +38,16 @@ export class LessonProgressService {
       },
     });
 
-    return await this.enrollmentService.calculateAndSaveProgress(
+    const enrollment = await this.enrollmentService.calculateAndSaveProgress(
       userId,
       lesson.courseId,
     );
+
+    return {
+      message: "Progress updated",
+      progress,
+      enrollment,
+    };
   }
 
   async markAsCompleted(userId: string, lessonId: string) {
@@ -51,7 +56,7 @@ export class LessonProgressService {
     });
     if (!lesson) throw new NotFoundException("Lesson not found");
 
-    await this.prisma.lessonProgress.upsert({
+    const progress = await this.prisma.lessonProgress.upsert({
       where: { userId_lessonId: { userId, lessonId } },
       update: { isCompleted: true, completedAt: new Date() },
       create: {
@@ -63,9 +68,15 @@ export class LessonProgressService {
       },
     });
 
-    return await this.enrollmentService.calculateAndSaveProgress(
+    const enrollment = await this.enrollmentService.calculateAndSaveProgress(
       userId,
       lesson.courseId,
     );
+
+    return {
+      message: "Lesson marked as completed",
+      progress,
+      enrollment,
+    };
   }
 }
