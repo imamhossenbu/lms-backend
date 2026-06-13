@@ -12,6 +12,7 @@ import { LessonModule } from "./lession/lesson.module";
 import { OrderModule } from "./order/order.module";
 import { PaymentModule } from "./payment/payment.module";
 import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
+import { QuizModule } from "./quiz/quiz.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
     OrderModule,
     PaymentModule,
     LessonProgressModule,
+    QuizModule,
   ],
 })
 export class AppModule {}
