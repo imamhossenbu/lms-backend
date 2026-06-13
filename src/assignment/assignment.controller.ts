@@ -23,7 +23,7 @@ export class AssignmentController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles("TEACHER")
+  @Roles("TEACHER", "ADMIN")
   async create(@Body() body: any) {
     return this.service.create(body);
   }
@@ -36,18 +36,17 @@ export class AssignmentController {
   @Post(":assignmentId/submit")
   @UseInterceptors(FileInterceptor("file"))
   async submit(
+    @Param("assignmentId") assignmentId: string,
     @Req() req: any,
-    @Param("assignmentId") id: string,
+    @Body() dto: any,
     @UploadedFile() file: Express.Multer.File,
-    @Body("textAnswer") textAnswer: string,
   ) {
-    const fileUrl = file ? `/uploads/assignments/${file.filename}` : "";
-    return this.service.submit(req.user.userId, id, { fileUrl, textAnswer });
+    return this.service.submit(assignmentId, req.user.userId, dto, file);
   }
 
   @Patch("grade/:submissionId")
   @UseGuards(RolesGuard)
-  @Roles("TEACHER")
+  @Roles("TEACHER", "ADMIN")
   async grade(@Param("submissionId") id: string, @Body() body: any) {
     return this.service.grade(id, body);
   }

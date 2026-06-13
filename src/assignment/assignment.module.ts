@@ -1,30 +1,18 @@
 import { Module } from "@nestjs/common";
-
 import { PrismaModule } from "../prisma/prisma.module";
 import { MulterModule } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
-import { extname } from "path";
+import { memoryStorage } from "multer"; // diskStorage বাদ দিয়ে memoryStorage
 import { AssignmentController } from "./assignment.controller";
 import { AssignmentService } from "./assignment.service";
-
+import { CloudinaryService } from "../cloudinary/cloudinary.service"; 
 @Module({
   imports: [
     PrismaModule,
     MulterModule.register({
-      storage: diskStorage({
-        destination: "./uploads/assignments",
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + "-" + Math.round(Math.random() * 1e9);
-          cb(
-            null,
-            `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
-          );
-        },
-      }),
+      storage: memoryStorage(),
     }),
   ],
   controllers: [AssignmentController],
-  providers: [AssignmentService],
+  providers: [AssignmentService, CloudinaryService],
 })
 export class AssignmentModule {}

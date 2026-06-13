@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { CloudinaryService } from "../cloudinary/cloudinary.service";
 
 @Injectable()
 export class AssignmentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cloudinary: CloudinaryService,
+  ) {}
 
   async create(data: any) {
     return await this.prisma.assignment.create({ data });
@@ -14,16 +18,23 @@ export class AssignmentService {
   }
 
   async submit(
-    userId: string,
     assignmentId: string,
-    data: { fileUrl: string; textAnswer?: string },
+    userId: string,
+    dto: any,
+    file?: Express.Multer.File,
   ) {
+    let fileUrl: string | undefined = undefined;
+
+    if (file) {
+      fileUrl = await this.cloudinary.uploadFile(file);
+    }
+
     return await this.prisma.assignmentSubmission.create({
       data: {
         assignmentId,
         userId,
-        fileUrl: data.fileUrl,
-        textAnswer: data.textAnswer,
+        fileUrl,
+        textAnswer: dto.textAnswer,
         status: "PENDING",
       },
     });
