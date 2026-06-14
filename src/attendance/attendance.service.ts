@@ -17,14 +17,25 @@ export class AttendanceService {
     });
   }
 
+  // attendance.service.ts
   async ping(id: string) {
-    const record = await this.prisma.attendance.findUnique({ where: { id } });
-    if (!record || record.status === "SUSPENDED") return;
+    try {
+      const record = await this.prisma.attendance.findUnique({
+        where: { id },
+      });
 
-    return await this.prisma.attendance.update({
-      where: { id },
-      data: { durationMinutes: { increment: 1 } },
-    });
+      if (!record || record.status === "SUSPENDED") {
+        return { message: "Attendance inactive or suspended" };
+      }
+
+      return await this.prisma.attendance.update({
+        where: { id },
+        data: { durationMinutes: { increment: 1 } },
+      });
+    } catch (error) {
+      console.error("Database connection error:", error);
+      throw new Error("Database connection lost. Please try again.");
+    }
   }
 
   async updateStatus(id: string, status: "ACTIVE" | "SUSPENDED") {

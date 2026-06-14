@@ -15,7 +15,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 
 @Controller("attendance")
-@UseGuards(AuthGuard("jwt"),RolesGuard)
+@UseGuards(AuthGuard("jwt"), RolesGuard)
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
 
@@ -42,21 +42,24 @@ export class AttendanceController {
     return await this.attendanceService.checkOut(id);
   }
 
-  @Get('class/:liveClassId')
-  @Roles('ADMIN', 'INSTRUCTOR')
-  async getByClass(@Param('liveClassId') liveClassId: string) {
+  @Get("class/:liveClassId")
+  @Roles("ADMIN", "TEACHER")
+  async getByClass(@Param("liveClassId") liveClassId: string) {
     return await this.attendanceService.getByLiveClassId(liveClassId);
   }
 
-  @Patch('admin/update-duration/:id')
-  @Roles('ADMIN')
-  async updateDuration(@Param('id') id: string, @Body('minutes') minutes: number) {
+  @Patch("admin/update-duration/:id")
+  @Roles("ADMIN", "TEACHER")
+  async updateDuration(
+    @Param("id") id: string,
+    @Body("minutes") minutes: number,
+  ) {
     return await this.attendanceService.updateDuration(id, minutes);
   }
 
-  @Delete('admin/:id')
-  @Roles('ADMIN')
-  async remove(@Param('id') id: string) {
+  @Delete("admin/:id")
+  @Roles("ADMIN", "TEACHER")
+  async remove(@Param("id") id: string) {
     return await this.attendanceService.remove(id);
   }
 }
