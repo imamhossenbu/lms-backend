@@ -21,6 +21,7 @@ import { CertificateModule } from "./certificate/certificate.module";
 import { NotificationModule } from "./notification/notification.module";
 import { AnnouncementModule } from "./announcement/announcement.module";
 import { LiveClassModule } from "./live-class/live-class.module";
+import { AttendanceModule } from "./attendance/attendance.module";
 
 @Module({
   imports: [
@@ -44,7 +45,8 @@ import { LiveClassModule } from "./live-class/live-class.module";
     CertificateModule,
     NotificationModule,
     AnnouncementModule,
-    LiveClassModule
+    LiveClassModule,
+    AttendanceModule,
   ],
 })
 export class AppModule {}

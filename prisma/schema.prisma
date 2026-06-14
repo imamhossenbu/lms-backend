@@ -29,7 +29,7 @@ model User {
   socialLinks  String?
   address      String?
   certificates Certificate[]
-
+attendances Attendance[]
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -456,6 +456,8 @@ model Attendance {
   leftAt          DateTime?
   durationMinutes Int
   status          String
+
+  user            User      @relation(fields: [userId], references: [id])
 }
 
 model ActivityLog {
