@@ -1,14 +1,16 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import axios from "axios";
 import * as qs from "qs";
 import { EnrollmentService } from "../enrollment/enrollment.service";
+import { InvoiceService } from "../invoice/invoice.service";
 
 @Injectable()
 export class PaymentService {
   constructor(
     private prisma: PrismaService,
     private enrollmentService: EnrollmentService,
+    private invoiceService: InvoiceService,
   ) {}
 
   async initiatePayment(userId: string, orderId: string) {
@@ -87,40 +89,42 @@ export class PaymentService {
     }
 
     if (order.status === "PAID") {
-      return {
-        message: "Payment already completed",
-      };
+      return { message: "Payment already completed" };
     }
 
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId,
-        userId: order.userId,
-        courseId: order.courseId,
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.create({
+          data: {
+            orderId,
+            userId: order.userId,
+            courseId: order.courseId,
+            provider: "SSLCOMMERZ",
+            providerTransactionId: transactionId,
+            amount: order.totalAmount,
+            currency: order.currency,
+            status: "SUCCESS",
+            gatewayResponse: JSON.stringify(gatewayData),
+            paidAt: new Date(),
+          },
+        });
 
-        provider: "SSLCOMMERZ",
-        providerTransactionId: transactionId,
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: "PAID" },
+        });
 
-        amount: order.totalAmount,
-        currency: order.currency,
+        await this.enrollmentService.enrollUser(order.userId, order.courseId);
 
-        status: "SUCCESS",
+        await this.invoiceService.generateInvoice(orderId);
 
-        gatewayResponse: JSON.stringify(gatewayData),
-
-        paidAt: new Date(),
-      },
-    });
-
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: "PAID",
-      },
-    });
-
-    await this.enrollmentService.enrollUser(order.userId, order.courseId);
-
-    return payment;
+        return payment;
+      });
+    } catch (error) {
+      console.error("Payment Recording Error:", error);
+      throw new InternalServerErrorException(
+        "Failed to complete payment process.",
+      );
+    }
   }
 }
