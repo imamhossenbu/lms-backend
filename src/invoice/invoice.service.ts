@@ -30,7 +30,22 @@ export class InvoiceService {
     private cloudinary: CloudinaryService,
   ) {}
 
-  // ── main entry ──────────────────────────────────────────────────────────
+  // ── main entry
+
+  // ── get all invoices for a user
+  async getMyInvoices(userId: string) {
+    return await this.prisma.invoice.findMany({
+      where: { userId },
+      orderBy: { issuedAt: "desc" },
+    });
+  }
+
+  // ── get single invoice by id
+  async findOne(id: string) {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) throw new NotFoundException("Invoice not found");
+    return invoice;
+  }
   async generateInvoice(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
