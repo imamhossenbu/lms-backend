@@ -16,6 +16,7 @@ import { QuizModule } from "./quiz/quiz.module";
 import { AssignmentModule } from "./assignment/assignment.module";
 import { CouponModule } from "./coupon/coupon.module";
 import { DiscussionModule } from "./discussion/discussion.module";
+import { ReviewModule } from "./review/review.module";
 
 @Module({
   imports: [
@@ -34,7 +35,8 @@ import { DiscussionModule } from "./discussion/discussion.module";
     QuizModule,
     AssignmentModule,
     CouponModule,
-    DiscussionModule
+    DiscussionModule,
+    ReviewModule,
   ],
 })
 export class AppModule {}

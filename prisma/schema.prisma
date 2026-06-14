@@ -67,6 +67,8 @@ model Course {
   ratingAverage   Decimal        @default(0)
   totalStudents   Int            @default(0)
 
+
+reviews CourseReview[]
   orders          Order[]
   modules         CourseModule[]
 }
@@ -231,6 +233,7 @@ model CourseReview {
   reviewText String?
   status    String
   createdAt DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id])
 }
 
 model Certificate {
