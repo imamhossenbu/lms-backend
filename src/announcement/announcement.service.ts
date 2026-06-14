@@ -37,6 +37,12 @@ export class AnnouncementService {
     });
   }
 
+  async getAll() {
+    return await this.prisma.announcement.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   async delete(id: string) {
     const announcement = await this.prisma.announcement.findUnique({
       where: { id },
