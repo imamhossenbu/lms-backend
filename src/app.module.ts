@@ -15,6 +15,7 @@ import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
 import { QuizModule } from "./quiz/quiz.module";
 import { AssignmentModule } from "./assignment/assignment.module";
 import { CouponModule } from "./coupon/coupon.module";
+import { DiscussionModule } from "./discussion/discussion.module";
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { CouponModule } from "./coupon/coupon.module";
     LessonProgressModule,
     QuizModule,
     AssignmentModule,
-    CouponModule
+    CouponModule,
+    DiscussionModule
   ],
 })
 export class AppModule {}
