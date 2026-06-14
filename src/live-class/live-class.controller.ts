@@ -21,7 +21,7 @@ export class LiveClassController {
   constructor(private liveClassService: LiveClassService) {}
 
   @Post()
-  @Roles("INSTRUCTOR", "ADMIN")
+  @Roles("TEACHER", "ADMIN")
   async create(@Body() body: CreateLiveClassDto, @Req() req: any) {
     return await this.liveClassService.create(req.user.userId, body);
   }
@@ -38,7 +38,7 @@ export class LiveClassController {
   }
 
   @Patch(":id")
-  @Roles("INSTRUCTOR", "ADMIN")
+  @Roles("TEACHER", "ADMIN")
   async update(@Param("id") id: string, @Body() body: UpdateLiveClassDto) {
     return await this.liveClassService.update(id, body);
   }

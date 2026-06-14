@@ -20,6 +20,7 @@ import { ReviewModule } from "./review/review.module";
 import { CertificateModule } from "./certificate/certificate.module";
 import { NotificationModule } from "./notification/notification.module";
 import { AnnouncementModule } from "./announcement/announcement.module";
+import { LiveClassModule } from "./live-class/live-class.module";
 
 @Module({
   imports: [
@@ -42,7 +43,8 @@ import { AnnouncementModule } from "./announcement/announcement.module";
     ReviewModule,
     CertificateModule,
     NotificationModule,
-    AnnouncementModule
+    AnnouncementModule,
+    LiveClassModule
   ],
 })
 export class AppModule {}
