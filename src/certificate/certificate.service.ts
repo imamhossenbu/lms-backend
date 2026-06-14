@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { MailService } from "../auth/mail/mail.service";
+import { NotificationService } from "../notification/notification.service";
 const PDFDocument = require("pdfkit");
 const QRCode = require("qrcode");
 
@@ -26,6 +27,7 @@ export class CertificateService {
     private prisma: PrismaService,
     private cloudinary: CloudinaryService,
     private mailService: MailService,
+    private notificationService: NotificationService,
   ) {}
 
   // ── get user certificates ────────────────────────────────────────────────
@@ -88,6 +90,12 @@ export class CertificateService {
       course.title,
       certUrl,
       certNumber,
+    );
+
+    await this.notificationService.notify(
+      userId,
+      "CERTIFICATE_ISSUED",
+      course.title,
     );
 
     return newCert;

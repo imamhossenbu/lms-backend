@@ -18,6 +18,7 @@ import { CouponModule } from "./coupon/coupon.module";
 import { DiscussionModule } from "./discussion/discussion.module";
 import { ReviewModule } from "./review/review.module";
 import { CertificateModule } from "./certificate/certificate.module";
+import { NotificationModule } from "./notification/notification.module";
 
 @Module({
   imports: [
@@ -38,7 +39,8 @@ import { CertificateModule } from "./certificate/certificate.module";
     CouponModule,
     DiscussionModule,
     ReviewModule,
-    CertificateModule
+    CertificateModule,
+    NotificationModule
   ],
 })
 export class AppModule {}
