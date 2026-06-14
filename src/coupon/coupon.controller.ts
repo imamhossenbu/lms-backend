@@ -14,40 +14,8 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { AuthGuard } from "@nestjs/passport";
 
 @Controller("coupon")
-@UseGuards(AuthGuard("jwt"))
 export class CouponController {
   constructor(private readonly couponService: CouponService) {}
-
-  @Post()
-  @UseGuards(RolesGuard)
-  @Roles("ADMIN", "TEACHER")
-  async create(@Body() dto: any) {
-    return this.couponService.create(dto);
-  }
-
-  @Get()
-  async findAll() {
-    return this.couponService.findAll();
-  }
-
-  @Get(":id")
-  async findOne(@Param("id") id: string) {
-    return this.couponService.findOne(id);
-  }
-
-  @Patch(":id")
-  @UseGuards(RolesGuard)
-  @Roles("ADMIN", "TEACHER")
-  async update(@Param("id") id: string, @Body() dto: any) {
-    return this.couponService.update(id, dto);
-  }
-
-  @Delete(":id")
-  @UseGuards(RolesGuard)
-  @Roles("ADMIN")
-  async delete(@Param("id") id: string) {
-    return this.couponService.delete(id);
-  }
 
   @Get("validate/:code/:courseId")
   async validate(
@@ -55,5 +23,38 @@ export class CouponController {
     @Param("courseId") courseId: string,
   ) {
     return this.couponService.validateCoupon(code, courseId);
+  }
+
+  @Get()
+  @UseGuards(AuthGuard("jwt"))
+  async findAll() {
+    return this.couponService.findAll();
+  }
+
+  @Get(":id")
+  @UseGuards(AuthGuard("jwt"))
+  async findOne(@Param("id") id: string) {
+    return this.couponService.findOne(id);
+  }
+
+  @Post()
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  async create(@Body() dto: any) {
+    return this.couponService.create(dto);
+  }
+
+  @Patch(":id")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  async update(@Param("id") id: string, @Body() dto: any) {
+    return this.couponService.update(id, dto);
+  }
+
+  @Delete(":id")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN")
+  async delete(@Param("id") id: string) {
+    return this.couponService.delete(id);
   }
 }

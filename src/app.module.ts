@@ -14,7 +14,7 @@ import { PaymentModule } from "./payment/payment.module";
 import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
 import { QuizModule } from "./quiz/quiz.module";
 import { AssignmentModule } from "./assignment/assignment.module";
-import { CouponModule } from "./cupon/coupon.module";
+import { CouponModule } from "./coupon/coupon.module";
 
 @Module({
   imports: [

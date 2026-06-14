@@ -5,6 +5,7 @@ import * as nodemailer from "nodemailer";
 @Injectable()
 export class MailService {
   private transporter: nodemailer.Transporter;
+  private isMock: boolean = false;
 
   constructor(
     private configService: ConfigService,
@@ -36,6 +37,9 @@ export class MailService {
         tls: {
           rejectUnauthorized: false,
         },
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 5000,
       });
 
     // VERIFY SMTP CONNECTION
@@ -43,9 +47,13 @@ export class MailService {
       (error, success) => {
         if (error) {
           console.log(
-            "MAIL SERVER ERROR:",
-            error,
+            "MAIL SERVER ERROR: Connecting to SMTP failed. Falling back to console logging/jsonTransport.",
+            error.message || error,
           );
+          this.transporter = nodemailer.createTransport({
+            jsonTransport: true,
+          });
+          this.isMock = true;
         } else {
           console.log(
             "MAIL SERVER READY",
@@ -178,6 +186,12 @@ export class MailService {
       console.log(
         "Verification email sent",
       );
+      if (this.isMock) {
+        console.log("---------------- MOCK EMAIL ----------------");
+        console.log(`To: ${email}`);
+        console.log(`Verification URL: ${url}`);
+        console.log("--------------------------------------------");
+      }
     } catch (error: any) {
       console.log(
         "Verification Email Error:",
@@ -251,6 +265,12 @@ export class MailService {
       console.log(
         "Security email sent",
       );
+      if (this.isMock) {
+        console.log("---------------- MOCK EMAIL ----------------");
+        console.log(`To: ${email}`);
+        console.log(`Action: Password was ${action}`);
+        console.log("--------------------------------------------");
+      }
     } catch (error: any) {
       console.log(
         "Security Email Error:",
@@ -345,6 +365,12 @@ export class MailService {
       console.log(
         "Reset password email sent",
       );
+      if (this.isMock) {
+        console.log("---------------- MOCK EMAIL ----------------");
+        console.log(`To: ${email}`);
+        console.log(`Reset Password URL: ${url}`);
+        console.log("--------------------------------------------");
+      }
     } catch (error: any) {
       console.log(
         "Reset Password Email Error:",
