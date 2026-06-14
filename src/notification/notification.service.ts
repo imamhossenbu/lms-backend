@@ -1,26 +1,47 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { NotificationTemplates } from "./notification.types";
 
 @Injectable()
 export class NotificationService {
   constructor(private prisma: PrismaService) {}
 
+  async createTemplate(data: {
+    slug: string;
+    title: string;
+    message: string;
+    type: string;
+  }) {
+    return await this.prisma.notificationTemplate.create({ data });
+  }
+
+  async getAllTemplates() {
+    return await this.prisma.notificationTemplate.findMany();
+  }
+
+  async updateTemplate(id: string, data: { title: string; message: string }) {
+    return await this.prisma.notificationTemplate.update({
+      where: { id },
+      data: { title: data.title, message: data.message },
+    });
+  }
+
   async notify(
     userId: string,
-    templateKey: keyof typeof NotificationTemplates,
-    ...args: any[]
+    slug: string,
+    replacements: Record<string, string>,
   ) {
-    const template = NotificationTemplates[templateKey];
-    const message = (template.message as any)(...args);
+    const template = await this.prisma.notificationTemplate.findUnique({
+      where: { slug },
+    });
+    if (!template) throw new NotFoundException("Template not found");
+
+    let message = template.message;
+    Object.keys(replacements).forEach((key) => {
+      message = message.replace(`{{${key}}}`, replacements[key]);
+    });
 
     return await this.prisma.notification.create({
-      data: {
-        userId,
-        title: template.title,
-        message: message,
-        type: template.type,
-      },
+      data: { userId, title: template.title, message, type: template.type },
     });
   }
 

@@ -342,6 +342,15 @@ model Notification {
   createdAt DateTime @default(now())
 }
 
+model NotificationTemplate {
+  id      String @id @default(uuid())
+  slug    String @unique 
+  title   String
+  message String 
+  type    String 
+}
+
+
 model Announcement {
   id         String   @id @default(uuid())
   courseId   String
