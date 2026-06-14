@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import axios from "axios";
 import * as qs from "qs";
@@ -89,42 +89,46 @@ export class PaymentService {
     }
 
     if (order.status === "PAID") {
-      return { message: "Payment already completed" };
+      return {
+        message: "Payment already completed",
+      };
     }
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        orderId,
+        userId: order.userId,
+        courseId: order.courseId,
+
+        provider: "SSLCOMMERZ",
+        providerTransactionId: transactionId,
+
+        amount: order.totalAmount,
+        currency: order.currency,
+
+        status: "SUCCESS",
+
+        gatewayResponse: JSON.stringify(gatewayData),
+
+        paidAt: new Date(),
+      },
+    });
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: "PAID",
+      },
+    });
+
+    await this.enrollmentService.enrollUser(order.userId, order.courseId);
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.create({
-          data: {
-            orderId,
-            userId: order.userId,
-            courseId: order.courseId,
-            provider: "SSLCOMMERZ",
-            providerTransactionId: transactionId,
-            amount: order.totalAmount,
-            currency: order.currency,
-            status: "SUCCESS",
-            gatewayResponse: JSON.stringify(gatewayData),
-            paidAt: new Date(),
-          },
-        });
-
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status: "PAID" },
-        });
-
-        await this.enrollmentService.enrollUser(order.userId, order.courseId);
-
-        await this.invoiceService.generateInvoice(orderId);
-
-        return payment;
-      });
+      await this.invoiceService.generateInvoice(orderId);
+      console.log("Invoice generated successfully for order:", orderId);
     } catch (error) {
-      console.error("Payment Recording Error:", error);
-      throw new InternalServerErrorException(
-        "Failed to complete payment process.",
-      );
+      console.error("Failed to generate invoice:", error);
     }
+    return payment;
   }
 }
