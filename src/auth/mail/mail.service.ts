@@ -391,4 +391,96 @@ export class MailService {
     if (error) console.log("Reset Password Email Error:", error);
     else console.log("Reset password email sent:", data?.id);
   }
+
+  // ===============================
+  // CERTIFICATE ISSUED EMAIL
+  // ===============================
+
+  async sendCertificateEmail(
+    email: string,
+    userName: string,
+    courseName: string,
+    certificateUrl: string,
+    certNumber: string,
+  ) {
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 16px 36px;">
+
+          <div style="
+            width: 48px; height: 48px;
+            background: #fff7ed;
+            border-radius: 10px;
+            font-size: 22px;
+            line-height: 48px;
+            text-align: center;
+            margin-bottom: 24px;
+          ">🏆</div>
+
+          <h1 style="
+            margin: 0 0 10px 0;
+            color: #18181b;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.3;
+          ">Congratulations!</h1>
+
+          <p style="
+            margin: 0 0 28px 0;
+            color: #52525b;
+            font-size: 15px;
+            line-height: 1.7;
+          ">
+            You've successfully completed the course <strong>${courseName}</strong>! 
+            Your dedication and hard work have paid off. We are proud to award 
+            you this certificate.
+          </p>
+
+          <table cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
+            <tr>
+              <td style="background: #C8981E; border-radius: 8px;">
+                <a href="${certificateUrl}" style="
+                  display: inline-block;
+                  padding: 13px 28px;
+                  color: #ffffff;
+                  font-size: 15px;
+                  font-weight: 600;
+                  text-decoration: none;
+                ">Download Certificate →</a>
+              </td>
+            </tr>
+          </table>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="
+            background: #f9f9fb;
+            border-radius: 8px;
+            border: 1px solid #e4e4e7;
+            margin-bottom: 36px;
+          ">
+            <tr>
+              <td style="padding: 14px 16px;">
+                <p style="margin: 0 0 4px 0; color: #a1a1aa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+                  Certificate Number
+                </p>
+                <p style="margin: 0; color: #C8981E; font-size: 14px; font-weight: 600; font-family: monospace;">
+                  ${certNumber}
+                </p>
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+    `;
+
+    const { data, error } = await this.resend.emails.send({
+      from: `LMS Achievement <${this.fromEmail}>`,
+      to: email,
+      subject: `Achievement Unlocked: ${courseName} — LMS Platform`,
+      html: this.wrapTemplate(content, "#C8981E"), // সার্টিফিকেটের সাথে সামঞ্জস্য রেখে গোল্ড কালার
+    });
+
+    if (error) console.log("Certificate Email Error:", error);
+    else console.log("Certificate email sent:", data?.id);
+  }
 }

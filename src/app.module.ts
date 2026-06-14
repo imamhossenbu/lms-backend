@@ -17,6 +17,7 @@ import { AssignmentModule } from "./assignment/assignment.module";
 import { CouponModule } from "./coupon/coupon.module";
 import { DiscussionModule } from "./discussion/discussion.module";
 import { ReviewModule } from "./review/review.module";
+import { CertificateModule } from "./certificate/certificate.module";
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ReviewModule } from "./review/review.module";
     CouponModule,
     DiscussionModule,
     ReviewModule,
+    CertificateModule
   ],
 })
 export class AppModule {}

@@ -1,9 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { CertificateService } from "../certificate/certificate.service";
 
 @Injectable()
 export class EnrollmentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+  private certificateService: CertificateService
+  ) {}
 
   async enrollUser(userId: string, courseId: string, tx: any = this.prisma) {
     const existing = await tx.enrollment.findFirst({
@@ -48,6 +52,10 @@ export class EnrollmentService {
       where: { userId, courseId },
       data: { progressPercentage },
     });
+
+    if (progressPercentage === 100) {
+      await this.certificateService.generateCertificate(userId, courseId);
+    }
 
     return progressPercentage;
   }
