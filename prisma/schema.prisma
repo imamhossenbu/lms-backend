@@ -476,11 +476,45 @@ model ActivityLog {
 
 model Setting {
   id                 String  @id @default(uuid())
+  
+  
   siteName           String
   logo               String?
-  defaultLanguage    String
-  allowRegistration  Boolean
-  certificateEnabled Boolean
-  aiEnabled          Boolean
-  maintenanceMode    Boolean
+  favicon            String?
+  defaultLanguage    String  @default("bn")
+  
+
+  allowRegistration  Boolean @default(true)
+  certificateEnabled Boolean @default(true)
+  aiEnabled          Boolean @default(false)
+  maintenanceMode    Boolean @default(false)
+
+
+  
+  
+  primaryColor       String  @default("#2563eb")
+  secondaryColor     String  @default("#64748b")
+  accentColor        String  @default("#f59e0b")
+  
+
+  backgroundColor    String  @default("#ffffff")
+  surfaceColor       String  @default("#f8fafc")
+  textColor          String  @default("#1e293b")
+  textMutedColor     String  @default("#64748b")
+  
+
+  headerBackgroundColor String @default("#ffffff")
+  headerTextColor       String @default("#1e293b")
+  footerBackgroundColor String @default("#1e293b")
+  footerTextColor       String @default("#ffffff")
+
+
+  supportEmail       String?
+  contactPhone       String?
+  facebookUrl        String?
+  youtubeUrl         String?
+  
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
