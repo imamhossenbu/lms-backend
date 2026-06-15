@@ -26,6 +26,7 @@ import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ActivityLogInterceptor } from "./activity-log/activity-log.interceptor";
 import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { SettingsModule } from "./settings/settings.module";
+import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SettingsModule } from "./settings/settings.module";
     AttendanceModule,
     ActivityLogModule,
     SettingsModule,
+    AiSettingsModule
   ],
   providers: [
     {

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, ConflictException } from "@nestjs/common";
 import { UpdateAiSettingsDto } from "./dto/ai-settings.dto";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -12,17 +12,15 @@ export class AiSettingsService {
     });
   }
 
-  async updateSettings(data: UpdateAiSettingsDto) {
+  async createSettings(data: UpdateAiSettingsDto) {
     const existing = await this.prisma.aiSettings.findFirst();
 
     if (existing) {
-      return await this.prisma.aiSettings.update({
-        where: { id: existing.id },
-        data: data,
-      });
+      throw new ConflictException(
+        "AI Settings already exist. Please use PATCH to update.",
+      );
     }
 
-    // প্রথমবার সেভ করার জন্য
     return await this.prisma.aiSettings.create({
       data: {
         provider: data.provider || "groq",
@@ -33,6 +31,19 @@ export class AiSettingsService {
         systemPrompt: data.systemPrompt || "You are an assistant",
         isActive: data.isActive ?? true,
       },
+    });
+  }
+
+  async updateSettings(data: UpdateAiSettingsDto) {
+    const existing = await this.prisma.aiSettings.findFirst();
+
+    if (!existing) {
+      throw new Error("Settings not found. Create them first.");
+    }
+
+    return await this.prisma.aiSettings.update({
+      where: { id: existing.id },
+      data: data,
     });
   }
 }
