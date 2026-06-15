@@ -8,7 +8,13 @@ export class LiveClassService {
 
   async create(instructorId: string, data: CreateLiveClassDto) {
     return await this.prisma.liveClass.create({
-      data: { ...data, instructorId, status: "SCHEDULED" },
+      data: {
+        ...data,
+        instructorId,
+        status: "SCHEDULED",
+        startTime: new Date(data.startTime),
+        endTime: new Date(data.endTime),
+      },
     });
   }
 
@@ -28,7 +34,17 @@ export class LiveClassService {
   async update(id: string, data: UpdateLiveClassDto) {
     const liveClass = await this.prisma.liveClass.findUnique({ where: { id } });
     if (!liveClass) throw new NotFoundException("Class not found");
-    return await this.prisma.liveClass.update({ where: { id }, data });
+
+    const updateData = {
+      ...data,
+      ...(data.startTime && { startTime: new Date(data.startTime) }),
+      ...(data.endTime && { endTime: new Date(data.endTime) }),
+    };
+
+    return await this.prisma.liveClass.update({
+      where: { id },
+      data: updateData,
+    });
   }
 
   async delete(id: string) {

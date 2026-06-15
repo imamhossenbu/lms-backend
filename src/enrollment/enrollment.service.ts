@@ -6,17 +6,26 @@ import { CertificateService } from "../certificate/certificate.service";
 export class EnrollmentService {
   constructor(
     private prisma: PrismaService,
-  private certificateService: CertificateService
+    private certificateService: CertificateService,
   ) {}
 
   async enrollUser(userId: string, courseId: string, tx: any = this.prisma) {
+    console.log("ENROLL USER:", userId, courseId);
+
     const existing = await tx.enrollment.findFirst({
-      where: { userId, courseId },
+      where: {
+        userId,
+        courseId,
+      },
     });
 
-    if (existing) return existing;
+    console.log("EXISTING:", existing);
 
-    return await tx.enrollment.create({
+    if (existing) {
+      return existing;
+    }
+
+    const enrollment = await tx.enrollment.create({
       data: {
         userId,
         courseId,
@@ -24,6 +33,10 @@ export class EnrollmentService {
         enrolledAt: new Date(),
       },
     });
+
+    console.log("NEW ENROLLMENT:", enrollment);
+
+    return enrollment;
   }
 
   async hasAccess(userId: string, courseId: string): Promise<boolean> {
