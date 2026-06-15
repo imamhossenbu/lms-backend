@@ -1,33 +1,29 @@
 import {
   IsString,
   IsInt,
-  IsDecimal,
+  IsNumber,
   IsBoolean,
   IsOptional,
-  IsUrl,
   IsNotEmpty,
+  IsObject,
 } from "class-validator";
 
-export class UpdateAiSettingsDto {
-  @IsOptional() @IsString() provider?: string;
-  @IsOptional() @IsString() modelName?: string;
-  @IsOptional() @IsUrl() baseUrl?: string;
-  @IsOptional() @IsInt() maxTokens?: number;
-  @IsOptional() @IsDecimal() temperature?: number;
-  @IsOptional() @IsString() systemPrompt?: string;
-  @IsOptional() @IsBoolean() isActive?: boolean;
+export class FeatureConfigDto {
+  @IsString() provider!: string;
+  @IsString() modelName!: string;
+  @IsString() baseUrl!: string;
+  @IsInt() maxTokens!: number;
+  @IsNumber() temperature!: number;
+  @IsString() systemPrompt!: string;
+  @IsBoolean() isActive!: boolean;
 }
 
+// নতুন ফিচার যোগ করার DTO
 export class CreateAiSettingsDto {
-  @IsNotEmpty() @IsString() provider!: string;
-  @IsNotEmpty() @IsString() modelName!: string;
-  @IsNotEmpty() @IsUrl() baseUrl!: string;
+  @IsNotEmpty() @IsString() featureKey!: string;
+  @IsNotEmpty() @IsObject() config!: FeatureConfigDto;
+}
 
-  @IsNotEmpty() @IsInt() maxTokens!: number;
-
-  @IsNotEmpty() @IsDecimal() temperature!: number;
-
-  @IsNotEmpty() @IsString() systemPrompt!: string;
-
-  @IsOptional() @IsBoolean() isActive?: boolean;
+export class UpdateAiSettingsDto {
+  @IsOptional() @IsObject() config?: FeatureConfigDto;
 }

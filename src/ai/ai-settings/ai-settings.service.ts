@@ -1,49 +1,55 @@
-import { Injectable, ConflictException } from "@nestjs/common";
-import { UpdateAiSettingsDto } from "./dto/ai-settings.dto";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import {
+  CreateAiSettingsDto,
+  UpdateAiSettingsDto,
+} from "./dto/ai-settings.dto";
+import { Prisma } from "../../../generated/prisma";
 
 @Injectable()
 export class AiSettingsService {
   constructor(private prisma: PrismaService) {}
 
-  async getActiveSettings() {
-    return await this.prisma.aiSettings.findFirst({
-      where: { isActive: true },
-    });
+  async getAllSettings() {
+    return await this.prisma.aiSettings.findFirst();
   }
 
-  async createSettings(data: UpdateAiSettingsDto) {
-    const existing = await this.prisma.aiSettings.findFirst();
+  async saveFeature(data: CreateAiSettingsDto) {
+    let record = await this.prisma.aiSettings.findFirst();
+    const currentSettings = (record?.settings as Record<string, any>) || {};
 
-    if (existing) {
-      throw new ConflictException(
-        "AI Settings already exist. Please use PATCH to update.",
-      );
-    }
+    currentSettings[data.featureKey] = data.config;
 
-    return await this.prisma.aiSettings.create({
-      data: {
-        provider: data.provider || "groq",
-        modelName: data.modelName || "llama3-70b-8192",
-        baseUrl: data.baseUrl || "https://api.groq.com/openai/v1",
-        maxTokens: data.maxTokens || 2048,
-        temperature: data.temperature || 0.7,
-        systemPrompt: data.systemPrompt || "You are an assistant",
-        isActive: data.isActive ?? true,
-      },
-    });
-  }
-
-  async updateSettings(data: UpdateAiSettingsDto) {
-    const existing = await this.prisma.aiSettings.findFirst();
-
-    if (!existing) {
-      throw new Error("Settings not found. Create them first.");
+    if (!record) {
+      return await this.prisma.aiSettings.create({
+        data: { settings: currentSettings as Prisma.InputJsonValue },
+      });
     }
 
     return await this.prisma.aiSettings.update({
-      where: { id: existing.id },
-      data: data,
+      where: { id: record.id },
+      data: { settings: currentSettings as Prisma.InputJsonValue },
+    });
+  }
+
+  async updateFeature(featureKey: string, config: any) {
+    const record = await this.prisma.aiSettings.findFirst();
+
+    if (!record) {
+      throw new NotFoundException("Settings not found. Create settings first.");
+    }
+
+    const currentSettings = record.settings as Record<string, any>;
+
+    if (!currentSettings[featureKey]) {
+      throw new NotFoundException(`Feature '${featureKey}' not found.`);
+    }
+
+    currentSettings[featureKey] = config;
+
+    return await this.prisma.aiSettings.update({
+      where: { id: record.id },
+      data: { settings: currentSettings as Prisma.InputJsonValue },
     });
   }
 }

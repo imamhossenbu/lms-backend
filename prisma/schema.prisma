@@ -320,15 +320,24 @@ model AiLearningRecommendation {
   createdAt          DateTime @default(now())
 }
 
+// model AiSettings {
+//   id           String  @id @default(uuid())
+//   provider     String
+//   modelName    String
+//   baseUrl      String
+//   maxTokens    Int
+//   temperature  Decimal
+//   systemPrompt String
+//   isActive     Boolean @default(true)
+// }
+
+
 model AiSettings {
-  id           String  @id @default(uuid())
-  provider     String
-  modelName    String
-  baseUrl      String
-  maxTokens    Int
-  temperature  Decimal
-  systemPrompt String
-  isActive     Boolean @default(true)
+  id        String   @id @default(uuid())
+  settings  Json     
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_settings")
 }
 
 // --- Communication ---
