@@ -20,19 +20,19 @@ model User {
   verificationToken String?   @unique
   lastLoginAt       DateTime?
 
-  bio          String?
-  education    String?
-  skills       String?
-  interests    String?
-  country      String?
-  language     String?
-  socialLinks  String?
-  address      String?
-  certificates Certificate[]
-attendances Attendance[]
-  emailVerified Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  bio           String?
+  education     String?
+  skills        String?
+  interests     String?
+  country       String?
+  language      String?
+  socialLinks   String?
+  address       String?
+  certificates  Certificate[]
+  attendances   Attendance[]
+  emailVerified Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 // --- Courses & Learning ---
@@ -344,12 +344,11 @@ model Notification {
 
 model NotificationTemplate {
   id      String @id @default(uuid())
-  slug    String @unique 
+  slug    String @unique
   title   String
-  message String 
-  type    String 
+  message String
+  type    String
 }
-
 
 model Announcement {
   id         String   @id @default(uuid())
@@ -457,7 +456,7 @@ model Attendance {
   durationMinutes Int
   status          String
 
-  user            User      @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model ActivityLog {
@@ -469,6 +468,9 @@ model ActivityLog {
   ipAddress  String
   userAgent  String
   createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Setting {

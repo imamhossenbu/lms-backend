@@ -22,6 +22,9 @@ import { NotificationModule } from "./notification/notification.module";
 import { AnnouncementModule } from "./announcement/announcement.module";
 import { LiveClassModule } from "./live-class/live-class.module";
 import { AttendanceModule } from "./attendance/attendance.module";
+import { APP_INTERCEPTOR } from "@nestjs/core";
+import { ActivityLogInterceptor } from "./activity-log/activity-log.interceptor";
+import { ActivityLogModule } from "./activity-log/activity-log.module";
 
 @Module({
   imports: [
@@ -47,6 +50,13 @@ import { AttendanceModule } from "./attendance/attendance.module";
     AnnouncementModule,
     LiveClassModule,
     AttendanceModule,
+    ActivityLogModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ActivityLogInterceptor,
+    },
   ],
 })
 export class AppModule {}

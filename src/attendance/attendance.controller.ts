@@ -19,6 +19,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 export class AttendanceController {
   constructor(private attendanceService: AttendanceService) {}
 
+  
   @Post("check-in")
   async checkIn(@Body("liveClassId") liveClassId: string, @Req() req: any) {
     return await this.attendanceService.checkIn(req.user.userId, liveClassId);
