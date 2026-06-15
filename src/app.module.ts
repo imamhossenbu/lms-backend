@@ -25,6 +25,7 @@ import { AttendanceModule } from "./attendance/attendance.module";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ActivityLogInterceptor } from "./activity-log/activity-log.interceptor";
 import { ActivityLogModule } from "./activity-log/activity-log.module";
+import { SettingsModule } from "./settings/settings.module";
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ActivityLogModule } from "./activity-log/activity-log.module";
     LiveClassModule,
     AttendanceModule,
     ActivityLogModule,
+    SettingsModule,
   ],
   providers: [
     {
