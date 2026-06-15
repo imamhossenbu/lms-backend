@@ -517,4 +517,6 @@ model Setting {
 
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+@@map("settings")
 }

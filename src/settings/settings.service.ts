@@ -1,19 +1,27 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { UpdateSettingDto } from "./dto/update-settings.dto";
+import { CreateSettingDto, UpdateSettingDto } from "./dto/settings.dto";
 
 @Injectable()
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
-  async createInitialSettings(data: any) {
+  async createSettings(data: CreateSettingDto) {
     const existing = await this.prisma.setting.findFirst();
+
     if (existing) {
-      throw new Error("Settings already exist. Use Update instead.");
+      return await this.prisma.setting.update({
+        where: { id: existing.id },
+        data: data,
+      });
     }
 
     return await this.prisma.setting.create({
-      data: data,
+      data: {
+        ...data,
+        allowRegistration: data.allowRegistration ?? true,
+        maintenanceMode: data.maintenanceMode ?? false,
+      },
     });
   }
 
