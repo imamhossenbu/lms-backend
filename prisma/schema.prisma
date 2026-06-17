@@ -9,17 +9,17 @@ datasource db {
 
 // --- User Management ---
 model User {
-  id            String    @id @default(uuid())
-  name          String
-  email         String    @unique
-  password      String
-  phone         String?
-  avatar        String?
-  role          String    @default("STUDENT")
-  status        String    @default("PENDING")
+  id                String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  password          String
+  phone             String?
+  avatar            String?
+  role              String    @default("STUDENT")
+  status            String    @default("PENDING")
   verificationToken String?   @unique
   lastLoginAt       DateTime?
-  
+
   bio           String?
   education     String?
   skills        String?
@@ -28,10 +28,11 @@ model User {
   language      String?
   socialLinks   String?
   address       String?
-  
-  emailVerified Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  certificates  Certificate[]
+  attendances   Attendance[]
+  emailVerified Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 // --- Courses & Learning ---
@@ -46,51 +47,53 @@ model Category {
 }
 
 model Course {
-  id              String         @id @default(uuid())
-  title           String
-  slug            String         @unique
-  description     String
+  id               String   @id @default(uuid())
+  title            String
+  slug             String   @unique
+  description      String
   shortDescription String
-  thumbnail       String?
-  categoryId      String
-  category        Category       @relation(fields: [categoryId], references: [id])
-  instructorId    String
-  level           String
-  language        String
-  price           Decimal
-  isFree          Boolean        @default(false)
-  status          String
-  durationMinutes Int
-  requirements    String?
+  thumbnail        String?
+  categoryId       String
+  category         Category @relation(fields: [categoryId], references: [id])
+  instructorId     String
+  level            String
+  language         String
+  price            Decimal
+  isFree           Boolean  @default(false)
+  status           String
+  durationMinutes  Int
+  requirements     String?
   learningOutcomes String?
-  tags            String?
-  ratingAverage   Decimal        @default(0)
-  totalStudents   Int            @default(0)
+  tags             String?
+  ratingAverage    Decimal  @default(0)
+  totalStudents    Int      @default(0)
 
-  orders          Order[]
-  modules         CourseModule[]
+  certificates Certificate[]
+  reviews      CourseReview[]
+  orders       Order[]
+  modules      CourseModule[]
 }
 
 model CourseModule {
-  id          String   @id @default(uuid())
-  courseId    String
-  course      Course   @relation(fields: [courseId], references: [id])
-  title       String
-  description String?
-  order       Int
-  isLocked    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id              String   @id @default(uuid())
+  courseId        String
+  course          Course   @relation(fields: [courseId], references: [id])
+  title           String
+  description     String?
+  order           Int
+  isLocked        Boolean  @default(true)
+  createdAt       DateTime @default(now())
   durationMinutes Int      @default(0)
 
-  lessons     Lesson[] 
+  lessons Lesson[]
 }
 
 model Lesson {
-  id              String           @id @default(uuid())
-  courseId        String
-  moduleId        String
-  module          CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  
+  id       String       @id @default(uuid())
+  courseId String
+  moduleId String
+  module   CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
   title           String
   type            String
   content         String?
@@ -102,26 +105,27 @@ model Lesson {
   status          String
   lessonResources LessonResource[]
 }
+
 model LessonResource {
-  id          String @id @default(uuid())
-  lessonId    String
-  lesson      Lesson @relation(fields: [lessonId], references: [id])
-  title       String
-  fileUrl     String
-  fileType    String
-  size        String
+  id             String  @id @default(uuid())
+  lessonId       String
+  lesson         Lesson  @relation(fields: [lessonId], references: [id])
+  title          String
+  fileUrl        String
+  fileType       String
+  size           String
   isDownloadable Boolean @default(true)
 }
 
 model Enrollment {
-  id                String    @id @default(uuid())
-  userId            String
-  courseId          String
-  enrolledAt        DateTime  @default(now())
-  status            String
-  progressPercentage Int      @default(0)
-  completedAt       DateTime?
-  lastAccessedAt    DateTime?
+  id                 String    @id @default(uuid())
+  userId             String
+  courseId           String
+  enrolledAt         DateTime  @default(now())
+  status             String
+  progressPercentage Int       @default(0)
+  completedAt        DateTime?
+  lastAccessedAt     DateTime?
 }
 
 // --- Assessments ---
@@ -131,43 +135,42 @@ model LessonProgress {
   courseId       String
   lessonId       String
   isCompleted    Boolean   @default(false)
-  watchedSeconds Int       @default(0) 
-  lastPosition   Int       @default(0) 
+  watchedSeconds Int       @default(0)
+  lastPosition   Int       @default(0)
   completedAt    DateTime?
 
- 
-  @@unique([userId, lessonId]) 
+  @@unique([userId, lessonId])
 }
 
 model Quiz {
-  id              String   @id @default(uuid())
-  courseId        String
-  lessonId        String
-  title           String
-  description     String?
+  id               String  @id @default(uuid())
+  courseId         String
+  lessonId         String
+  title            String
+  description      String?
   timeLimitMinutes Int
-  passingScore    Int
-  totalMarks      Int
-  status          String
+  passingScore     Int
+  totalMarks       Int
+  status           String
 }
 
 model QuizQuestion {
-  id             String @id @default(uuid())
-  quizId         String
-  questionText   String
-  questionType   String
-  options        String // JSON string
-  correctAnswer  String
-  marks          Int
-  explanation    String?
-  order          Int
+  id            String  @id @default(uuid())
+  quizId        String
+  questionText  String
+  questionType  String
+  options       String
+  correctAnswer String
+  marks         Int
+  explanation   String?
+  order         Int
 }
 
 model QuizAttempt {
   id          String   @id @default(uuid())
   quizId      String
   userId      String
-  answers     String   // JSON string
+  answers     String // JSON string
   score       Int
   percentage  Decimal
   parsed      Boolean
@@ -176,15 +179,15 @@ model QuizAttempt {
 }
 
 model Assignment {
-  id              String   @id @default(uuid())
-  courseId        String
-  lessonId        String
-  title           String
-  description     String?
-  dueDate         DateTime
-  marks           Int
+  id               String   @id @default(uuid())
+  courseId         String
+  lessonId         String
+  title            String
+  description      String?
+  dueDate          DateTime
+  marks            Int
   allowedFileTypes String
-  status          String
+  status           String
 }
 
 model AssignmentSubmission {
@@ -202,56 +205,62 @@ model AssignmentSubmission {
 
 // --- Community ---
 model Discussion {
-  id         String    @id @default(uuid())
+  id         String            @id @default(uuid())
   courseId   String
   userId     String
   title      String
   body       String
   tags       String?
-  isResolved Boolean   @default(false)
-  createdAt  DateTime  @default(now())
+  isResolved Boolean           @default(false)
+  createdAt  DateTime          @default(now())
   replies    DiscussionReply[]
 }
 
 model DiscussionReply {
-  id             String     @id @default(uuid())
-  discussionId   String
-  discussion     Discussion @relation(fields: [discussionId], references: [id])
-  userId         String
-  body           String
-  parentReplyId  String?
-  createdAt      DateTime   @default(now())
+  id            String     @id @default(uuid())
+  discussionId  String
+  discussion    Discussion @relation(fields: [discussionId], references: [id])
+  userId        String
+  body          String
+  parentReplyId String?
+  createdAt     DateTime   @default(now())
 }
 
 model CourseReview {
-  id        String   @id @default(uuid())
-  courseId  String
-  userId    String
-  rating    Int
+  id         String   @id @default(uuid())
+  courseId   String
+  userId     String
+  rating     Int
   reviewText String?
-  status    String
-  createdAt DateTime @default(now())
+  status     String
+  createdAt  DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id])
 }
 
 model Certificate {
-  id              String   @id @default(uuid())
-  userId          String
-  courseId        String
-  certificateNumber String @unique
-  certificateUrl  String
-  issuedAt        DateTime @default(now())
-  verificationCode String
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  courseId          String
+  course            Course   @relation(fields: [courseId], references: [id])
+  certificateNumber String   @unique
+  certificateUrl    String
+  verificationCode  String   @unique
+  issuedAt          DateTime @default(now())
+
+  @@index([certificateNumber])
+  @@index([verificationCode])
 }
 
 // --- AI Engine ---
 model AiTutorSession {
-  id            String   @id @default(uuid())
+  id            String          @id @default(uuid())
   userId        String
   courseId      String
   lessonId      String
   title         String
   modelName     String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime        @default(now())
   lastMessageAt DateTime
   messages      AiChatMessage[]
 }
@@ -268,7 +277,7 @@ model AiChatMessage {
 }
 
 model AiKnowledgeDocument {
-  id         String @id @default(uuid())
+  id         String   @id @default(uuid())
   courseId   String
   lessonId   String
   title      String
@@ -280,46 +289,55 @@ model AiKnowledgeDocument {
 }
 
 model AiEmbedding {
-  id           String @id @default(uuid())
-  documentId   String
-  courseId     String
-  chunkText    String
+  id              String   @id @default(uuid())
+  documentId      String
+  courseId        String
+  chunkText       String
   embeddingVector String // Stores vector data
-  metadata     String? // JSON string
-  createdAt    DateTime @default(now())
+  metadata        String? // JSON string
+  createdAt       DateTime @default(now())
 }
 
 model AiGeneratedContent {
-  id        String   @id @default(uuid())
-  courseId  String
-  lessonId  String
-  type      String
-  prompt    String
-  output    String
-  reviewedByInstructor Boolean @default(false)
-  createdAt DateTime @default(now())
+  id                   String   @id @default(uuid())
+  courseId             String
+  lessonId             String
+  type                 String
+  prompt               String
+  output               String
+  reviewedByInstructor Boolean  @default(false)
+  createdAt            DateTime @default(now())
 }
 
 model AiLearningRecommendation {
-  id                String   @id @default(uuid())
-  userId            String
-  courseId          String
-  weakTopics        String
+  id                 String   @id @default(uuid())
+  userId             String
+  courseId           String
+  weakTopics         String
   recommendedLessons String
   recommendedCourses String
-  reason            String
-  createdAt         DateTime @default(now())
+  reason             String
+  createdAt          DateTime @default(now())
 }
 
+// model AiSettings {
+//   id           String  @id @default(uuid())
+//   provider     String
+//   modelName    String
+//   baseUrl      String
+//   maxTokens    Int
+//   temperature  Decimal
+//   systemPrompt String
+//   isActive     Boolean @default(true)
+// }
+
+
 model AiSettings {
-  id          String  @id @default(uuid())
-  provider    String
-  modelName   String
-  baseUrl     String
-  maxTokens   Int
-  temperature Decimal
-  systemPrompt String
-  isActive    Boolean @default(true)
+  id        String   @id @default(uuid())
+  settings  Json     
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_settings")
 }
 
 // --- Communication ---
@@ -333,29 +351,37 @@ model Notification {
   createdAt DateTime @default(now())
 }
 
+model NotificationTemplate {
+  id      String @id @default(uuid())
+  slug    String @unique
+  title   String
+  message String
+  type    String
+}
+
 model Announcement {
-  id        String   @id @default(uuid())
-  courseId  String
-  createdBy String
-  title     String
-  message   String
+  id         String   @id @default(uuid())
+  courseId   String
+  createdBy  String
+  title      String
+  message    String
   targetRole String
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 }
 
 // --- Payments & Settings ---
 model Coupon {
-  id               String   @id @default(uuid())
-  code             String   @unique
-  discountType     String
+  id                String   @id @default(uuid())
+  code              String   @unique
+  discountType      String
   discountTypeValue Decimal
-  courseId         String
-  maxUses          Int
-  usedCount        Int      @default(0)
-  startDate        DateTime
-  endDate          DateTime
-  status           String
-  createdAt        DateTime @default(now())
+  courseId          String
+  maxUses           Int
+  usedCount         Int      @default(0)
+  startDate         DateTime
+  endDate           DateTime
+  status            String
+  createdAt         DateTime @default(now())
 }
 
 model CouponUsage {
@@ -367,16 +393,14 @@ model CouponUsage {
   usedAt         DateTime @default(now())
 }
 
-
-
 model Order {
-  id             String   @id @default(uuid())
-  orderNumber    String   @unique
-  userId         String
-  courseId       String
-  
-  course         Course   @relation(fields: [courseId], references: [id])
-  
+  id          String @id @default(uuid())
+  orderNumber String @unique
+  userId      String
+  courseId    String
+
+  course Course @relation(fields: [courseId], references: [id])
+
   amount         Decimal
   discountAmount Decimal
   taxAmount      Decimal
@@ -389,57 +413,60 @@ model Order {
 }
 
 model Payment {
-  id                 String   @id @default(uuid())
-  orderId            String
-  userId             String
-  courseId           String
-  provider           String
+  id                    String    @id @default(uuid())
+  orderId               String
+  userId                String
+  courseId              String
+  provider              String
   providerTransactionId String
-  amount             Decimal
-  currency           String
-  status             String
-  gatewayResponse    String
-  paidAt             DateTime?
-  createdAt          DateTime @default(now())
+  amount                Decimal
+  currency              String
+  status                String
+  gatewayResponse       String
+  paidAt                DateTime?
+  createdAt             DateTime  @default(now())
 }
 
 model Invoice {
-  id            String   @id @default(uuid())
-  invoiceNumber String   @unique
-  orderId       String
-  userId        String
-  courseId      String
-  amount        Decimal
+  id             String   @id @default(uuid())
+  invoiceNumber  String   @unique
+  orderId        String
+  userId         String
+  courseId       String
+  amount         Decimal
   discountAmount Decimal
-  taxAmount     Decimal
-  totalAmount   Decimal
-  currency      String
-  invoiceUrl    String
-  issuedAt      DateTime @default(now())
+  taxAmount      Decimal
+  totalAmount    Decimal
+  currency       String
+  invoiceUrl     String
+  issuedAt       DateTime @default(now())
 }
 
 // --- Logs & System ---
 model LiveClass {
-  id            String    @id @default(uuid())
-  courseId      String
-  instructorId  String
-  title         String
-  description   String?
-  meetingUrl    String
-  startTime     DateTime
-  endTime       DateTime
-  recordingUrl  String?
-  status        String
+  id           String   @id @default(uuid())
+  courseId     String
+  instructorId String
+  title        String
+  description  String?
+  meetingUrl   String
+  startTime    DateTime
+  endTime      DateTime
+  recordingUrl String?
+  status       String
 }
 
 model Attendance {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   liveClassId     String
   userId          String
   joinedAt        DateTime
   leftAt          DateTime?
   durationMinutes Int
   status          String
+
+  user User @relation(fields: [userId], references: [id])
+  @@unique([userId, liveClassId])
 }
 
 model ActivityLog {
@@ -451,15 +478,54 @@ model ActivityLog {
   ipAddress  String
   userAgent  String
   createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Setting {
-  id              String  @id @default(uuid())
-  siteName        String
-  logo            String?
-  defaultLanguage String
-  allowRegistration Boolean
-  certificateEnabled Boolean
-  aiEnabled       Boolean
-  maintenanceMode Boolean
+  id                 String  @id @default(uuid())
+  
+  
+  siteName           String
+  logo               String?
+  favicon            String?
+  defaultLanguage    String  @default("bn")
+  
+
+  allowRegistration  Boolean @default(true)
+  certificateEnabled Boolean @default(true)
+  aiEnabled          Boolean @default(false)
+  maintenanceMode    Boolean @default(false)
+
+
+  
+  
+  primaryColor       String  @default("#2563eb")
+  secondaryColor     String  @default("#64748b")
+  accentColor        String  @default("#f59e0b")
+  
+
+  backgroundColor    String  @default("#ffffff")
+  surfaceColor       String  @default("#f8fafc")
+  textColor          String  @default("#1e293b")
+  textMutedColor     String  @default("#64748b")
+  
+
+  headerBackgroundColor String @default("#ffffff")
+  headerTextColor       String @default("#1e293b")
+  footerBackgroundColor String @default("#1e293b")
+  footerTextColor       String @default("#ffffff")
+
+
+  supportEmail       String?
+  contactPhone       String?
+  facebookUrl        String?
+  youtubeUrl         String?
+  
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+@@map("settings")
 }

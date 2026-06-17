@@ -11,6 +11,22 @@ import { LessonResourceModule } from "./lession-resource/lesson-resource.module"
 import { LessonModule } from "./lession/lesson.module";
 import { OrderModule } from "./order/order.module";
 import { PaymentModule } from "./payment/payment.module";
+import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
+import { QuizModule } from "./quiz/quiz.module";
+import { AssignmentModule } from "./assignment/assignment.module";
+import { CouponModule } from "./coupon/coupon.module";
+import { DiscussionModule } from "./discussion/discussion.module";
+import { ReviewModule } from "./review/review.module";
+import { CertificateModule } from "./certificate/certificate.module";
+import { NotificationModule } from "./notification/notification.module";
+import { AnnouncementModule } from "./announcement/announcement.module";
+import { LiveClassModule } from "./live-class/live-class.module";
+import { AttendanceModule } from "./attendance/attendance.module";
+import { APP_INTERCEPTOR } from "@nestjs/core";
+import { ActivityLogInterceptor } from "./activity-log/activity-log.interceptor";
+import { ActivityLogModule } from "./activity-log/activity-log.module";
+import { SettingsModule } from "./settings/settings.module";
+import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
 
 @Module({
   imports: [
@@ -25,6 +41,26 @@ import { PaymentModule } from "./payment/payment.module";
     LessonResourceModule,
     OrderModule,
     PaymentModule,
+    LessonProgressModule,
+    QuizModule,
+    AssignmentModule,
+    CouponModule,
+    DiscussionModule,
+    ReviewModule,
+    CertificateModule,
+    NotificationModule,
+    AnnouncementModule,
+    LiveClassModule,
+    AttendanceModule,
+    ActivityLogModule,
+    SettingsModule,
+    AiSettingsModule
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ActivityLogInterceptor,
+    },
   ],
 })
 export class AppModule {}

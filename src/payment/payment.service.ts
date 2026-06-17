@@ -3,12 +3,14 @@ import { PrismaService } from "../prisma/prisma.service";
 import axios from "axios";
 import * as qs from "qs";
 import { EnrollmentService } from "../enrollment/enrollment.service";
+import { InvoiceService } from "../invoice/invoice.service";
 
 @Injectable()
 export class PaymentService {
   constructor(
     private prisma: PrismaService,
     private enrollmentService: EnrollmentService,
+    private invoiceService: InvoiceService,
   ) {}
 
 
@@ -82,47 +84,55 @@ export class PaymentService {
     transactionId: string,
     gatewayData: any,
   ) {
-    return await this.prisma.$transaction(
-      async (tx) => {
-        const order = await tx.order.findUnique({
-          where: { id: orderId },
-        });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
 
-        if (!order) throw new NotFoundException("Order not found");
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
 
-        if (order.status === "PAID") {
-          return { message: "Payment already completed" };
-        }
+    if (order.status === "PAID") {
+      return {
+        message: "Payment already completed",
+      };
+    }
 
-        const payment = await tx.payment.create({
-          data: {
-            orderId,
-            userId: order.userId,
-            courseId: order.courseId,
-            provider: "SSLCOMMERZ",
-            providerTransactionId: transactionId,
-            amount: order.totalAmount,
-            currency: order.currency,
-            status: "SUCCESS",
-            gatewayResponse: JSON.stringify(gatewayData),
-            paidAt: new Date(),
-          },
-        });
+    const payment = await this.prisma.payment.create({
+      data: {
+        orderId,
+        userId: order.userId,
+        courseId: order.courseId,
 
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status: "PAID" },
-        });
+        provider: "SSLCOMMERZ",
+        providerTransactionId: transactionId,
 
-        await this.enrollmentService.enrollUser(
-          order.userId,
-          order.courseId,
-          tx,
-        );
+        amount: order.totalAmount,
+        currency: order.currency,
 
-        return payment;
+        status: "SUCCESS",
+
+        gatewayResponse: JSON.stringify(gatewayData),
+
+        paidAt: new Date(),
       },
-      { timeout: 10000 },
-    );
+    });
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: "PAID",
+      },
+    });
+
+    await this.enrollmentService.enrollUser(order.userId, order.courseId);
+
+    try {
+      await this.invoiceService.generateInvoice(orderId);
+      console.log("Invoice generated successfully for order:", orderId);
+    } catch (error) {
+      console.error("Failed to generate invoice:", error);
+    }
+    return payment;
   }
 }

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateOrderDto } from "./dto/order.dto";
+import { Prisma } from "../../generated/prisma";
 
 @Injectable()
 export class OrderService {
@@ -16,19 +17,61 @@ export class OrderService {
     });
     if (!course) throw new NotFoundException("Course not found");
 
-    return await this.prisma.order.create({
-      data: {
-        orderNumber: `ORD-${Date.now()}`,
-        userId: userId,
-        courseId: dto.courseId,
-        amount: course.price,
-        discountAmount: 0,
-        taxAmount: 0,
-        totalAmount: course.price,
-        currency: "BDT",
-        status: "PENDING",
-        couponId: dto.couponId || null,
-      },
+    const priceNumber = course.price.toNumber();
+    let discount = 0;
+    let finalAmount = priceNumber;
+
+    if (dto.couponId) {
+      const coupon = await this.prisma.coupon.findUnique({
+        where: { id: dto.couponId },
+      });
+
+      if (coupon && coupon.usedCount < coupon.maxUses) {
+        const discountValue = coupon.discountTypeValue.toNumber();
+
+        discount =
+          coupon.discountType === "PERCENTAGE"
+            ? (priceNumber * discountValue) / 100
+            : discountValue;
+
+        finalAmount = priceNumber - discount;
+      }
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          orderNumber: `ORD-${Date.now()}`,
+          userId: userId,
+          courseId: dto.courseId,
+
+          amount: new Prisma.Decimal(priceNumber),
+          discountAmount: new Prisma.Decimal(discount),
+          taxAmount: new Prisma.Decimal(0),
+          totalAmount: new Prisma.Decimal(finalAmount),
+          currency: "BDT",
+          status: "PENDING",
+          couponId: dto.couponId || null,
+        },
+      });
+
+      if (dto.couponId) {
+        await tx.coupon.update({
+          where: { id: dto.couponId },
+          data: { usedCount: { increment: 1 } },
+        });
+
+        await tx.couponUsage.create({
+          data: {
+            couponId: dto.couponId,
+            userId: userId,
+            orderId: order.id,
+            discountAmount: new Prisma.Decimal(discount),
+          },
+        });
+      }
+
+      return order;
     });
   }
 

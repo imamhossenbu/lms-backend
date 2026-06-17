@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { CreateLessonResourceDto } from "./dto/resource.dto";
@@ -15,14 +19,29 @@ export class LessonResourceService {
     dto: CreateLessonResourceDto,
     file: Express.Multer.File,
   ) {
-    const fileUrl = await this.cloudinary.uploadFile(file);
+    if (!file) throw new BadRequestException("File is required");
+
+    // Cloudinary upload
+    const uploadResult = await this.cloudinary.uploadFile(file);
+    const fileUrl = (uploadResult as any).secure_url || uploadResult;
+
+    const durationInSeconds = (uploadResult as any).duration || 0;
+    const durationInMinutes = Math.round(durationInSeconds / 60);
+
+    if (file.mimetype.startsWith("video/")) {
+      await this.prisma.lesson.update({
+        where: { id: lessonId },
+        data: { durationMinutes: durationInMinutes },
+      });
+    }
 
     return await this.prisma.lessonResource.create({
       data: {
-        ...dto,
+        title: dto.title,
         fileUrl,
-        lessonId,
+        fileType: file.mimetype,
         size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+        lessonId,
         isDownloadable: String(dto.isDownloadable) !== "false",
       },
     });
@@ -41,20 +60,29 @@ export class LessonResourceService {
   ) {
     const existing = await this.prisma.lessonResource.findUnique({
       where: { id },
+      include: { lesson: true },
     });
     if (!existing) throw new NotFoundException("Resource not found");
 
     let updateData: any = { ...dto };
 
-   
-    if (dto.isDownloadable !== undefined) {
-      updateData.isDownloadable = String(dto.isDownloadable) !== "false";
+    if (file) {
+      const uploadResult = await this.cloudinary.uploadFile(file);
+      updateData.fileUrl = (uploadResult as any).secure_url || uploadResult;
+      updateData.fileType = file.mimetype;
+      updateData.size = (file.size / 1024 / 1024).toFixed(2) + " MB";
+
+      if (file.mimetype.startsWith("video/")) {
+        const durationInSeconds = (uploadResult as any).duration || 0;
+        await this.prisma.lesson.update({
+          where: { id: existing.lessonId },
+          data: { durationMinutes: Math.round(durationInSeconds / 60) },
+        });
+      }
     }
 
-    if (file) {
-      const fileUrl = await this.cloudinary.uploadFile(file);
-      updateData.fileUrl = fileUrl;
-      updateData.size = (file.size / 1024 / 1024).toFixed(2) + " MB";
+    if (dto.isDownloadable !== undefined) {
+      updateData.isDownloadable = String(dto.isDownloadable) !== "false";
     }
 
     return await this.prisma.lessonResource.update({
@@ -62,8 +90,8 @@ export class LessonResourceService {
       data: updateData,
     });
   }
-
   async delete(id: string) {
     return await this.prisma.lessonResource.delete({ where: { id } });
   }
 }
+

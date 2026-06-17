@@ -1,18 +1,31 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { CertificateService } from "../certificate/certificate.service";
 
 @Injectable()
 export class EnrollmentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private certificateService: CertificateService,
+  ) {}
 
   async enrollUser(userId: string, courseId: string, tx: any = this.prisma) {
+    console.log("ENROLL USER:", userId, courseId);
+
     const existing = await tx.enrollment.findFirst({
-      where: { userId, courseId },
+      where: {
+        userId,
+        courseId,
+      },
     });
 
-    if (existing) return existing;
+    console.log("EXISTING:", existing);
 
-    return await tx.enrollment.create({
+    if (existing) {
+      return existing;
+    }
+
+    const enrollment = await tx.enrollment.create({
       data: {
         userId,
         courseId,
@@ -20,6 +33,10 @@ export class EnrollmentService {
         enrolledAt: new Date(),
       },
     });
+
+    console.log("NEW ENROLLMENT:", enrollment);
+
+    return enrollment;
   }
 
   async hasAccess(userId: string, courseId: string): Promise<boolean> {
@@ -48,6 +65,10 @@ export class EnrollmentService {
       where: { userId, courseId },
       data: { progressPercentage },
     });
+
+    if (progressPercentage === 100) {
+      await this.certificateService.generateCertificate(userId, courseId);
+    }
 
     return progressPercentage;
   }
