@@ -1,6 +1,19 @@
-node_modules
+# Dependencies
+node_modules/
+
 # Keep environment variables out of version control
 .env
-dist
+.env*.local
 
-/generated/prisma
+# Build outputs
+dist/
+generated/prisma/
+*.tsbuildinfo
+
+# OS metadata
+.DS_Store
+.DS_Store?
+._*
+
+# Local uploads
+uploads/
