@@ -4,7 +4,9 @@ import {
   Body,
   UseGuards,
   ValidationPipe,
+  Res,
 } from "@nestjs/common";
+import { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
@@ -14,6 +16,8 @@ import {
   GenerateQuizDto,
   GenerateCourseOutlineDto,
   EvaluateAssignmentDto,
+  SummarizeLessonDto,
+  GenerateFlashcardsDto,
 } from "./dto/ai.dto";
 
 @Controller("ai")
@@ -22,11 +26,42 @@ export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   /**
-   * Ask the AI Tutor about any lesson or course topic
+   * Standard AI Tutor / Doubt Solver
    */
   @Post("tutor-chat")
   async askTutor(@Body(new ValidationPipe({ transform: true })) dto: AskTutorDto) {
     return this.aiService.askTutor(dto);
+  }
+
+  /**
+   * Real-time Streaming AI Tutor Chat (SSE)
+   */
+  @Post("tutor-chat/stream")
+  async streamTutorChat(
+    @Body(new ValidationPipe({ transform: true })) dto: AskTutorDto,
+    @Res() res: Response,
+  ) {
+    return this.aiService.streamTutorChat(dto, res);
+  }
+
+  /**
+   * AI Lesson Summarizer & Key Notes Generator
+   */
+  @Post("summarize-lesson")
+  async summarizeLesson(
+    @Body(new ValidationPipe({ transform: true })) dto: SummarizeLessonDto,
+  ) {
+    return this.aiService.summarizeLesson(dto);
+  }
+
+  /**
+   * AI Flashcards Generator for fast active recall
+   */
+  @Post("generate-flashcards")
+  async generateFlashcards(
+    @Body(new ValidationPipe({ transform: true })) dto: GenerateFlashcardsDto,
+  ) {
+    return this.aiService.generateFlashcards(dto);
   }
 
   /**

@@ -73,3 +73,29 @@ export class EvaluateAssignmentDto {
   @IsNotEmpty()
   studentSubmission!: string;
 }
+
+export class SummarizeLessonDto {
+  @IsString()
+  @IsOptional()
+  lessonId?: string;
+
+  @IsString()
+  @IsOptional()
+  lessonTitle?: string;
+
+  @IsString()
+  @IsOptional()
+  content?: string;
+}
+
+export class GenerateFlashcardsDto {
+  @IsString()
+  @IsNotEmpty()
+  topic!: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  @Max(20)
+  numCards?: number = 5;
+}

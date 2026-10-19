@@ -2,11 +2,14 @@ import { Injectable, Logger, InternalServerErrorException } from "@nestjs/common
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import axios from "axios";
+import { Response } from "express";
 import {
   AskTutorDto,
   GenerateQuizDto,
   GenerateCourseOutlineDto,
   EvaluateAssignmentDto,
+  SummarizeLessonDto,
+  GenerateFlashcardsDto,
 } from "./dto/ai.dto";
 
 @Injectable()
@@ -115,14 +118,14 @@ export class AiService {
   }
 
   /**
-   * AI Tutor / Doubt Solver for students
+   * Helper to build curriculum context from course and lesson IDs
    */
-  async askTutor(dto: AskTutorDto) {
+  private async buildCurriculumContext(courseId?: string, lessonId?: string): Promise<string> {
     let context = "";
 
-    if (dto.courseId) {
+    if (courseId) {
       const course = await this.prisma.course.findUnique({
-        where: { id: dto.courseId },
+        where: { id: courseId },
         select: { title: true, description: true },
       });
       if (course) {
@@ -130,15 +133,24 @@ export class AiService {
       }
     }
 
-    if (dto.lessonId) {
+    if (lessonId) {
       const lesson = await this.prisma.lesson.findUnique({
-        where: { id: dto.lessonId },
+        where: { id: lessonId },
         select: { title: true, content: true },
       });
       if (lesson) {
         context += `Lesson: "${lesson.title}". Lesson Content: ${lesson.content || "N/A"}\n`;
       }
     }
+
+    return context;
+  }
+
+  /**
+   * Standard AI Tutor / Doubt Solver for students
+   */
+  async askTutor(dto: AskTutorDto) {
+    const context = await this.buildCurriculumContext(dto.courseId, dto.lessonId);
 
     const systemInstruction = `You are a supportive, encouraging, and knowledgeable AI Tutor on the LMS Platform. 
 Your goal is to help students understand concepts deeply, clarify doubts, and provide clear step-by-step explanations.
@@ -151,6 +163,82 @@ Be clear, accurate, and format responses with clean markdown when helpful.`;
       answer,
       timestamp: new Date(),
     };
+  }
+
+  /**
+   * Real-time Streaming AI Tutor Chat (SSE - Server-Sent Events)
+   */
+  async streamTutorChat(dto: AskTutorDto, res: Response): Promise<void> {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const context = await this.buildCurriculumContext(dto.courseId, dto.lessonId);
+
+    const systemInstruction = `You are a supportive, encouraging, and knowledgeable AI Tutor on the LMS Platform. 
+Your goal is to help students understand concepts deeply, clarify doubts, and provide clear step-by-step explanations.
+${context ? `Use the following curriculum context when answering:\n${context}` : ""}
+Be clear, accurate, and format responses with clean markdown when helpful.`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:streamGenerateContent?alt=sse&key=${this.geminiApiKey}`;
+
+    try {
+      const response = await axios.post(
+        url,
+        {
+          contents: [{ role: "user", parts: [{ text: dto.message }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          responseType: "stream",
+          timeout: 45000,
+        },
+      );
+
+      let buffer = "";
+
+      response.data.on("data", (chunk: Buffer) => {
+        buffer += chunk.toString("utf8");
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data:")) {
+            const jsonStr = trimmed.replace("data:", "").trim();
+            if (!jsonStr) continue;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                res.write(`data: ${JSON.stringify({ text })}\n\n`);
+              }
+            } catch {
+              // Ignore non-json or incomplete chunks
+            }
+          }
+        }
+      });
+
+      response.data.on("end", () => {
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+      });
+
+      response.data.on("error", (err: any) => {
+        this.logger.error("Streaming error:", err);
+        res.write(`data: ${JSON.stringify({ error: "Stream error occurred" })}\n\n`);
+        res.end();
+      });
+    } catch (err: any) {
+      this.logger.error("Failed to initiate stream:", err.message);
+      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.end();
+    }
   }
 
   /**
@@ -182,7 +270,6 @@ Return ONLY a valid JSON object in this exact schema without any markdown format
     try {
       return JSON.parse(raw);
     } catch {
-      // Clean possible markdown code fences if present
       const cleaned = raw.replace(/```json/g, "").replace(/```/g, "").trim();
       return JSON.parse(cleaned);
     }
@@ -254,6 +341,79 @@ Return ONLY a valid JSON object in this exact schema:
 }`;
 
     const raw = await this.generateText(prompt, "You are an objective, encouraging academic evaluator.", true);
+    try {
+      return JSON.parse(raw);
+    } catch {
+      const cleaned = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+      return JSON.parse(cleaned);
+    }
+  }
+
+  /**
+   * AI Lesson Summarizer & Key Notes Generator
+   */
+  async summarizeLesson(dto: SummarizeLessonDto) {
+    let contentToSummarize = dto.content || "";
+    let title = dto.lessonTitle || "Lesson Summary";
+
+    if (dto.lessonId) {
+      const lesson = await this.prisma.lesson.findUnique({
+        where: { id: dto.lessonId },
+      });
+      if (lesson) {
+        title = lesson.title;
+        contentToSummarize = lesson.content || contentToSummarize;
+      }
+    }
+
+    const prompt = `Summarize the following lesson content into concise study notes.
+Lesson Title: "${title}"
+Content:
+"""
+${contentToSummarize || "Overview of key concepts"}
+"""
+
+Return ONLY a valid JSON object in this exact schema:
+{
+  "title": "${title}",
+  "quickSummary": "Concise 2-3 sentence overview",
+  "keyTakeaways": ["Point 1", "Point 2", "Point 3", "Point 4"],
+  "importantConcepts": [
+    { "term": "Concept Name", "definition": "Brief definition" }
+  ],
+  "actionItems": ["Actionable step 1 for learners", "Actionable step 2 for learners"]
+}`;
+
+    const raw = await this.generateText(prompt, "You are an expert academic note summarizer.", true);
+    try {
+      return JSON.parse(raw);
+    } catch {
+      const cleaned = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+      return JSON.parse(cleaned);
+    }
+  }
+
+  /**
+   * AI Flashcards Generator for fast revision
+   */
+  async generateFlashcards(dto: GenerateFlashcardsDto) {
+    const num = dto.numCards || 5;
+
+    const prompt = `Create ${num} high-yield revision flashcards on the topic: "${dto.topic}".
+Return ONLY a valid JSON object in this exact schema:
+{
+  "topic": "${dto.topic}",
+  "flashcards": [
+    {
+      "id": 1,
+      "front": "Question or term on the front of the card",
+      "back": "Clear concise answer or explanation on the back",
+      "hint": "Optional brief memory hint"
+    }
+  ]
+}`;
+
+    const raw = await this.generateText(prompt, "You are an expert flashcard author for fast active recall learning.", true);
     try {
       return JSON.parse(raw);
     } catch {

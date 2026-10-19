@@ -28,10 +28,19 @@ import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { SettingsModule } from "./settings/settings.module";
 import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
 import { AiModule } from "./ai/ai-service/ai.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 120, // 120 requests per minute per IP
+      },
+    ]),
     PrismaModule,
     AuthModule,
     UserModule,
@@ -57,11 +66,16 @@ import { AiModule } from "./ai/ai-service/ai.module";
     SettingsModule,
     AiSettingsModule,
     AiModule,
+    AnalyticsModule,
   ],
   providers: [
     {
       provide: APP_INTERCEPTOR,
       useClass: ActivityLogInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })
