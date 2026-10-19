@@ -6,24 +6,28 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy configuration and source files
+COPY prisma ./prisma/
+COPY tsconfig*.json ./
+COPY src ./src/
 
-# Generate Prisma client and build
+# Generate Prisma client and compile TypeScript
 RUN npx prisma generate
 RUN npm run build
 
-# Stage 2: Production
-FROM node:20-alpine
+# Stage 2: Production Runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copy built assets
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/generated ./generated
+ENV NODE_ENV=production
 
-# Expose port
+# Copy necessary production artifacts
+COPY package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/generated ./generated
+COPY --from=builder /app/prisma ./prisma
+
 EXPOSE 4000
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]

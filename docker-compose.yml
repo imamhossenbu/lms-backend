@@ -1,21 +1,29 @@
-version: '3.8' 
+version: '3.8'
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lms_app
     env_file:
       - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - PORT=4000
+      - NODE_ENV=production
     healthcheck:
-      test: ["CMD-SHELL", "node -e 'require(\"http\").get(\"http://localhost:4000/\", (res) => { if (res.statusCode === 200) process.exit(0); else process.exit(1); })' || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "node -e 'require(\"http\").get(\"http://localhost:4000/api/docs\", (res) => { if (res.statusCode < 500) process.exit(0); else process.exit(1); })' || exit 1"]
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 20s
     restart: always
+    networks:
+      - lms_network
 
   nginx:
     image: nginx:alpine
+    container_name: lms_nginx
     ports:
       - "80:80"
     volumes:
@@ -23,3 +31,10 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    restart: always
+    networks:
+      - lms_network
+
+networks:
+  lms_network:
+    driver: bridge

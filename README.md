@@ -319,16 +319,53 @@ You can test every endpoint directly from the Swagger UI, complete with Bearer J
 
 ---
 
-## 🐳 Docker & Containerized Deployment
+## 🔄 Automated CI/CD Pipeline (GitHub Actions)
 
-This project includes a multi-stage Docker build and a ready-to-run `docker-compose.yml` with **Nginx** reverse proxy and health checks.
+A fully automated **GitHub Actions CI/CD pipeline** is configured in [`.github/workflows/ci-cd.yml`](file:///.github/workflows/ci-cd.yml):
+
+```mermaid
+graph LR
+    Push[Git Push / PR to main] --> Job1[1. ci-build: Node 20 + Prisma + TypeScript Build]
+    Job1 --> Job2[2. docker-build: Docker Build & Verification]
+    Job2 --> Job3[3. cd-deploy: Production Deployment Stage]
+```
+
+### CI/CD Workflow Stages:
+1. **`ci-build` (Continuous Integration):**
+   - Runs on `ubuntu-latest` with Node.js 20.x.
+   - Restores npm cache and installs packages.
+   - Generates Prisma client bindings (`npx prisma generate`).
+   - Verifies zero TypeScript compilation errors (`npm run build`).
+2. **`docker-build` (Container Verification):**
+   - Sets up Docker Buildx with GitHub Actions layer caching.
+   - Compiles and tests the multi-stage `Dockerfile` to guarantee reproducibility.
+3. **`cd-deploy` (Continuous Deployment):**
+   - Triggers automatically upon merging to the `main` branch.
+   - Supports automated webhooks (Render / Railway / CapRover) or SSH runner deployments.
+
+---
+
+## 🐳 Docker & High-Performance Nginx Reverse Proxy
+
+The application includes a production-ready, multi-stage Docker setup orchestrated with **Nginx** reverse proxy in [`docker-compose.yml`](file:///docker-compose.yml):
+
+### Key Nginx Features ([`nginx.conf`](file:///nginx.conf)):
+- **Real-Time SSE Streaming (`/ai/tutor-chat/stream`):** Configured with `proxy_buffering off;`, `proxy_cache off;`, and `chunked_transfer_encoding off;` so that AI responses stream smoothly to clients token-by-token.
+- **Large Payload Support:** Configured with `client_max_body_size 100M;` to support video uploads, course assets, and PDF submissions.
+- **Gzip Compression:** Automatically compresses JSON, JS, CSS, and API responses to minimize bandwidth and accelerate mobile load times.
+- **Security Headers:** Enforces `X-Frame-Options`, `X-Content-Type-Options: nosniff`, and `X-XSS-Protection`.
+
+### Run with Docker Compose:
 
 ```bash
-# Build and run containers in detached mode
+# Build and start all containers in detached mode
 docker-compose up --build -d
 
-# View real-time container logs
-docker-compose logs -f app
+# View real-time application and Nginx logs
+docker-compose logs -f
+
+# Check container health status
+docker-compose ps
 
 # Stop all containers
 docker-compose down
