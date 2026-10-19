@@ -49,7 +49,7 @@ export class AiService {
           ],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 8192,
           },
         };
 
@@ -80,35 +80,40 @@ export class AiService {
 
     // Fallback: Groq API
     if (this.groqApiKey) {
-      try {
-        const messages: any[] = [];
-        if (systemInstruction) {
-          messages.push({ role: "system", content: systemInstruction });
-        }
-        messages.push({ role: "user", content: prompt });
+      const groqModels = ["qwen/qwen3.8-27b", "openai/gpt-oss-20b", "openai/gpt-oss-120b"];
+      for (const model of groqModels) {
+        try {
+          const messages: any[] = [];
+          if (systemInstruction) {
+            messages.push({ role: "system", content: systemInstruction });
+          }
+          messages.push({ role: "user", content: prompt });
 
-        const response = await axios.post(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            model: "llama-3.3-70b-versatile",
-            messages,
-            temperature: 0.7,
-            max_tokens: 2048,
-            ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${this.groqApiKey}`,
-              "Content-Type": "application/json",
+          const response = await axios.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+              model,
+              messages,
+              temperature: 0.7,
+              max_tokens: 2048,
+              ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
             },
-            timeout: 30000,
-          },
-        );
+            {
+              headers: {
+                Authorization: `Bearer ${this.groqApiKey}`,
+                "Content-Type": "application/json",
+              },
+              timeout: 30000,
+            },
+          );
 
-        const text = response.data?.choices?.[0]?.message?.content;
-        if (text) return text.trim();
-      } catch (err: any) {
-        this.logger.error(`Groq API failed: ${err.message}`);
+          const text = response.data?.choices?.[0]?.message?.content;
+          if (text) return text.trim();
+        } catch (err: any) {
+          this.logger.warn(
+            `Groq API model ${model} failed: ${err?.response?.data?.error?.message || err.message}. Trying next fallback...`,
+          );
+        }
       }
     }
 
@@ -235,7 +240,75 @@ Be clear, accurate, and format responses with clean markdown when helpful.`;
         res.end();
       });
     } catch (err: any) {
-      this.logger.error("Failed to initiate stream:", err.message);
+      this.logger.warn(`Gemini streaming failed: ${err.message}. Attempting Groq streaming fallback...`);
+      if (this.groqApiKey) {
+        try {
+          const messages = [
+            { role: "system", content: systemInstruction },
+            { role: "user", content: dto.message },
+          ];
+          const groqRes = await axios.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+              model: "qwen/qwen3.8-27b",
+              messages,
+              temperature: 0.7,
+              stream: true,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${this.groqApiKey}`,
+                "Content-Type": "application/json",
+              },
+              responseType: "stream",
+              timeout: 45000,
+            },
+          );
+
+          let buffer = "";
+          groqRes.data.on("data", (chunk: Buffer) => {
+            buffer += chunk.toString("utf8");
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith("data:")) {
+                const jsonStr = trimmed.replace("data:", "").trim();
+                if (!jsonStr || jsonStr === "[DONE]") {
+                  if (jsonStr === "[DONE]") {
+                    res.write(`data: [DONE]\n\n`);
+                  }
+                  continue;
+                }
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const text = parsed?.choices?.[0]?.delta?.content;
+                  if (text) {
+                    res.write(`data: ${JSON.stringify({ text })}\n\n`);
+                  }
+                } catch {
+                  // Ignore JSON parse errors for incomplete chunks
+                }
+              }
+            }
+          });
+
+          groqRes.data.on("end", () => {
+            res.write(`data: [DONE]\n\n`);
+            res.end();
+          });
+
+          groqRes.data.on("error", (e: any) => {
+            this.logger.error("Groq stream error:", e);
+            res.write(`data: ${JSON.stringify({ error: "Stream error occurred" })}\n\n`);
+            res.end();
+          });
+          return;
+        } catch (groqErr: any) {
+          this.logger.error("Groq streaming fallback also failed:", groqErr.message);
+        }
+      }
       res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
       res.end();
     }
