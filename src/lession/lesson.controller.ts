@@ -7,7 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
-  Req as NestReq,
+  Req,
 } from "@nestjs/common";
 import { LessonService } from "./lesson.service";
 import { CreateLessonDto, UpdateLessonDto } from "./dto/lesson.dto";
@@ -35,6 +35,11 @@ export class LessonController {
     return this.lessonService.findAllByModule(moduleId);
   }
 
+  @Get(":id")
+  async findOne(@Req() req: any, @Param("id") id: string) {
+    return this.lessonService.findOne(req.user.userId, req.user.role, id);
+  }
+
   @Patch(":id")
   @Roles("ADMIN", "TEACHER")
   async update(@Param("id") id: string, @Body() dto: UpdateLessonDto) {
@@ -53,11 +58,4 @@ export class LessonController {
     const userId = req.user.userId;
     return await this.lessonService.completeLesson(userId, lessonId);
   }
-}
-function Req(): (
-  target: LessonController,
-  propertyKey: "complete",
-  parameterIndex: 0,
-) => void {
-  return NestReq();
 }

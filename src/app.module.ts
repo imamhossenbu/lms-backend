@@ -27,6 +27,7 @@ import { ActivityLogInterceptor } from "./activity-log/activity-log.interceptor"
 import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { SettingsModule } from "./settings/settings.module";
 import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
+import { AiModule } from "./ai/ai-service/ai.module";
 
 @Module({
   imports: [
@@ -54,7 +55,8 @@ import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
     AttendanceModule,
     ActivityLogModule,
     SettingsModule,
-    AiSettingsModule
+    AiSettingsModule,
+    AiModule,
   ],
   providers: [
     {

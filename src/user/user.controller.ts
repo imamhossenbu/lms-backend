@@ -47,6 +47,18 @@ export class UserController {
     return this.userService.updateProfile(req.user.userId, data, avatarUrl);
   }
 
+  @Patch("change-password")
+  async changePassword(
+    @Req() req: RequestWithUser,
+    @Body() body: { currentPassword: string; newPassword: string },
+  ) {
+    return this.userService.changePassword(
+      req.user.userId,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
+
   @Patch("admin/change-role")
   @Roles("ADMIN")
   async changeRole(@Body() body: { userId: string; role: string }) {

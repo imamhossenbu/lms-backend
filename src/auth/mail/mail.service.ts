@@ -1,19 +1,32 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Resend } from "resend";
+import * as nodemailer from "nodemailer";
 
 @Injectable()
 export class MailService {
-  private resend: Resend;
+  private transporter: nodemailer.Transporter;
   private fromName = "LMS Platform";
   private fromEmail: string;
 
   constructor(private configService: ConfigService) {
-    this.resend = new Resend(this.configService.get<string>("RESEND_API_KEY"));
     this.fromEmail =
-      this.configService.get<string>("MAIL_FROM") ?? "onboarding@resend.dev";
+      this.configService.get<string>("MAIL_FROM") ?? "imam.adsfixter@gmail.com";
 
-    console.log("MAIL SERVICE READY (Resend HTTP API)");
+    const user =
+      this.configService.get<string>("MAIL_USER") || "imam.adsfixter@gmail.com";
+    const pass = (
+      this.configService.get<string>("MAIL_PASS") || "fjrvqrnhdicsckui"
+    ).replace(/\s+/g, "");
+
+    this.transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user,
+        pass,
+      },
+    });
+
+    console.log("MAIL SERVICE READY (Nodemailer Gmail SMTP)");
   }
 
   // ===============================
@@ -184,15 +197,17 @@ export class MailService {
       </tr>
     `;
 
-    const { data, error } = await this.resend.emails.send({
-      from: `${this.fromName} <${this.fromEmail}>`,
-      to: email,
-      subject: "Verify your email — LMS Platform",
-      html: this.wrapTemplate(content, "#534AB7"),
-    });
-
-    if (error) console.log("Verification Email Error:", error);
-    else console.log("Verification email sent:", data?.id);
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"${this.fromName}" <${this.fromEmail}>`,
+        to: email,
+        subject: "Verify your email — LMS Platform",
+        html: this.wrapTemplate(content, "#534AB7"),
+      });
+      console.log("Verification email sent:", info.messageId);
+    } catch (error) {
+      console.error("Verification Email Error:", error);
+    }
   }
 
   // ===============================
@@ -279,15 +294,17 @@ export class MailService {
       </tr>
     `;
 
-    const { data, error } = await this.resend.emails.send({
-      from: `LMS Security <${this.fromEmail}>`,
-      to: email,
-      subject: "Security Alert: Account Activity — LMS Platform",
-      html: this.wrapTemplate(content, "#dc2626"),
-    });
-
-    if (error) console.log("Security Email Error:", error);
-    else console.log("Security email sent:", data?.id);
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"LMS Security" <${this.fromEmail}>`,
+        to: email,
+        subject: "Security Alert: Account Activity — LMS Platform",
+        html: this.wrapTemplate(content, "#dc2626"),
+      });
+      console.log("Security email sent:", info.messageId);
+    } catch (error) {
+      console.error("Security Email Error:", error);
+    }
   }
 
   // ===============================
@@ -381,15 +398,17 @@ export class MailService {
       </tr>
     `;
 
-    const { data, error } = await this.resend.emails.send({
-      from: `LMS Support <${this.fromEmail}>`,
-      to: email,
-      subject: "Reset your password — LMS Platform",
-      html: this.wrapTemplate(content, "#16a34a"),
-    });
-
-    if (error) console.log("Reset Password Email Error:", error);
-    else console.log("Reset password email sent:", data?.id);
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"LMS Support" <${this.fromEmail}>`,
+        to: email,
+        subject: "Reset your password — LMS Platform",
+        html: this.wrapTemplate(content, "#16a34a"),
+      });
+      console.log("Reset password email sent:", info.messageId);
+    } catch (error) {
+      console.error("Reset Password Email Error:", error);
+    }
   }
 
   // ===============================
@@ -473,14 +492,16 @@ export class MailService {
       </tr>
     `;
 
-    const { data, error } = await this.resend.emails.send({
-      from: `LMS Achievement <${this.fromEmail}>`,
-      to: email,
-      subject: `Achievement Unlocked: ${courseName} — LMS Platform`,
-      html: this.wrapTemplate(content, "#C8981E"), // সার্টিফিকেটের সাথে সামঞ্জস্য রেখে গোল্ড কালার
-    });
-
-    if (error) console.log("Certificate Email Error:", error);
-    else console.log("Certificate email sent:", data?.id);
+    try {
+      const info = await this.transporter.sendMail({
+        from: `"LMS Achievement" <${this.fromEmail}>`,
+        to: email,
+        subject: `Achievement Unlocked: ${courseName} — LMS Platform`,
+        html: this.wrapTemplate(content, "#C8981E"), // সার্টিফিকেটের সাথে সামঞ্জস্য রেখে গোল্ড কালার
+      });
+      console.log("Certificate email sent:", info.messageId);
+    } catch (error) {
+      console.error("Certificate Email Error:", error);
+    }
   }
 }

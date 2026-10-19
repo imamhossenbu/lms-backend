@@ -28,9 +28,26 @@ export class AssignmentController {
     return this.service.create(body);
   }
 
+  @Get("my-submissions")
+  async getMySubmissions(@Req() req: any) {
+    return this.service.getMySubmissions(req.user.userId);
+  }
+
   @Get("course/:courseId")
   async findAll(@Param("courseId") courseId: string) {
     return this.service.findAll(courseId);
+  }
+
+  @Get(":id")
+  async findOne(@Param("id") id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Get(":assignmentId/submissions")
+  @UseGuards(RolesGuard)
+  @Roles("TEACHER", "ADMIN")
+  async getSubmissions(@Param("assignmentId") assignmentId: string) {
+    return this.service.getSubmissionsByAssignment(assignmentId);
   }
 
   @Post(":assignmentId/submit")

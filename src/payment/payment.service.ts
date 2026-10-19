@@ -25,6 +25,10 @@ export class PaymentService {
       throw new NotFoundException("Order not found");
     }
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
     const payload = {
       store_id: process.env.SSL_STORE_ID,
       store_passwd: process.env.SSL_STORE_PASSWORD,
@@ -34,15 +38,15 @@ export class PaymentService {
       tran_id: order.orderNumber,
 
       success_url: `${process.env.BACKEND_URL}/payments/success/${order.id}`,
-      fail_url: `${process.env.BACKEND_URL}/payments/fail`,
-      cancel_url: `${process.env.BACKEND_URL}/payments/cancel`,
+      fail_url: `${process.env.BACKEND_URL}/payments/fail/${order.id}`,
+      cancel_url: `${process.env.BACKEND_URL}/payments/cancel/${order.id}`,
 
-      cus_name: "Student",
-      cus_email: "student@example.com",
-      cus_add1: "Dhaka",
-      cus_city: "Dhaka",
+      cus_name: user?.name || "Student",
+      cus_email: user?.email || "student@example.com",
+      cus_add1: user?.address || "Dhaka",
+      cus_city: user?.country || "Dhaka",
       cus_country: "Bangladesh",
-      cus_phone: "01700000000",
+      cus_phone: user?.phone || "01700000000",
 
       shipping_method: "NO",
 
@@ -135,4 +139,51 @@ export class PaymentService {
     }
     return payment;
   }
+
+  // Handle failed payment callback
+  async handleFailedPayment(orderId: string, gatewayData: any) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: "FAILED" },
+    });
+
+    return {
+      status: "FAILED",
+      message: "Payment failed or was declined.",
+      orderId,
+      gatewayData,
+    };
+  }
+
+  // Handle cancelled payment callback
+  async handleCancelledPayment(orderId: string, gatewayData: any) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: "CANCELLED" },
+    });
+
+    return {
+      status: "CANCELLED",
+      message: "Payment was cancelled by user.",
+      orderId,
+      gatewayData,
+    };
+  }
 }
+

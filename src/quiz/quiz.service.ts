@@ -9,10 +9,61 @@ export class QuizService {
     return await this.prisma.quiz.create({ data });
   }
 
-  async getQuiz(quizId: string) {
-    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
+  async getQuiz(quizId: string, role?: string) {
+    const quiz = await this.prisma.quiz.findUnique({
+      where: { id: quizId },
+    });
     if (!quiz) throw new NotFoundException("Quiz not found");
-    return quiz;
+
+    const questions = await this.prisma.quizQuestion.findMany({
+      where: { quizId },
+      orderBy: { order: "asc" },
+    });
+
+    // Hide correctAnswer from students so they cannot inspect answers before submitting
+    if (role === "STUDENT") {
+      const sanitizedQuestions = questions.map((q) => {
+        const { correctAnswer, ...rest } = q;
+        return rest;
+      });
+      return { ...quiz, questions: sanitizedQuestions };
+    }
+
+    return { ...quiz, questions };
+  }
+
+  async getMyAttempts(userId: string, quizId?: string) {
+    return await this.prisma.quizAttempt.findMany({
+      where: {
+        userId,
+        ...(quizId && { quizId }),
+      },
+      orderBy: { submittedAt: "desc" },
+    });
+  }
+
+  async getQuizAttemptsForTeacher(quizId: string) {
+    const attempts = await this.prisma.quizAttempt.findMany({
+      where: { quizId },
+      orderBy: { submittedAt: "desc" },
+    });
+
+    const userIds = attempts.map((a) => a.userId);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatar: true,
+      },
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return attempts.map((attempt) => ({
+      ...attempt,
+      user: userMap.get(attempt.userId) || null,
+    }));
   }
 
   async updateQuiz(id: string, data: any) {

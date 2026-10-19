@@ -32,6 +32,28 @@ export class LessonService {
     });
   }
 
+  async findOne(userId: string, role: string, lessonId: string) {
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { lessonResources: true },
+    });
+    if (!lesson) throw new NotFoundException("Lesson not found");
+
+    if (!lesson.isPreview && role !== "ADMIN" && role !== "TEACHER") {
+      const hasAccess = await this.enrollmentService.hasAccess(
+        userId,
+        lesson.courseId,
+      );
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          "You must be enrolled in this course to access this lesson.",
+        );
+      }
+    }
+
+    return lesson;
+  }
+
   async update(id: string, dto: UpdateLessonDto) {
     const lesson = await this.prisma.lesson.findUnique({ where: { id } });
     if (!lesson) throw new NotFoundException("Lesson not found");
