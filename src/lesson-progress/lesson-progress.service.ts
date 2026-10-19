@@ -9,6 +9,42 @@ export class LessonProgressService {
     private enrollmentService: EnrollmentService,
   ) {}
 
+  /**
+   * Get user's completed lessons and progress map for a course
+   */
+  async getCourseProgress(userId: string, courseId: string) {
+    const [totalLessons, progresses, enrollment] = await Promise.all([
+      this.prisma.lesson.count({ where: { courseId } }),
+      this.prisma.lessonProgress.findMany({
+        where: { userId, courseId },
+        select: {
+          lessonId: true,
+          isCompleted: true,
+          watchedSeconds: true,
+          completedAt: true,
+        },
+      }),
+      this.prisma.enrollment.findFirst({
+        where: { userId, courseId, status: "ACTIVE" },
+        select: { progressPercentage: true, completedAt: true },
+      }),
+    ]);
+
+    const completedLessonIds = progresses
+      .filter((p) => p.isCompleted)
+      .map((p) => p.lessonId);
+
+    return {
+      courseId,
+      totalLessons,
+      completedLessonsCount: completedLessonIds.length,
+      progressPercentage: enrollment?.progressPercentage || 0,
+      isCourseCompleted: (enrollment?.progressPercentage || 0) === 100,
+      completedLessonIds,
+      progresses,
+    };
+  }
+
   async updateVideoProgress(
     userId: string,
     lessonId: string,

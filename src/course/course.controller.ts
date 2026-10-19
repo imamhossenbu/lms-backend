@@ -10,9 +10,11 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from "@nestjs/common";
 import { CourseService } from "./course.service";
 import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
+import { CourseQueryDto } from "./dto/course-query.dto";
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -36,8 +38,8 @@ export class CourseController {
   }
 
   @Get()
-  async findAll() {
-    return this.courseService.findAll();
+  async findAll(@Query() query: CourseQueryDto) {
+    return this.courseService.findAll(query);
   }
 
   @Get(":id")

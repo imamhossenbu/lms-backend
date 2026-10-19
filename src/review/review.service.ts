@@ -14,6 +14,18 @@ export class ReviewService {
     userId: string,
     data: { courseId: string; rating: number; reviewText?: string },
   ) {
+    // 1. Verify that the student is actually enrolled in this course
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: { userId, courseId: data.courseId, status: "ACTIVE" },
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException(
+        "Only enrolled students are allowed to leave a review for this course.",
+      );
+    }
+
+    // 2. Check for duplicate review
     const existing = await this.prisma.courseReview.findFirst({
       where: { userId, courseId: data.courseId },
     });
@@ -62,14 +74,40 @@ export class ReviewService {
       throw new ForbiddenException("Unauthorized");
     }
 
-    return await this.prisma.courseReview.delete({ where: { id } });
+    const deleted = await this.prisma.courseReview.delete({ where: { id } });
+    await this.recalculateCourseRating(deleted.courseId);
+    return deleted;
   }
 
   async updateStatus(id: string, status: "APPROVED" | "REJECTED") {
-    return await this.prisma.courseReview.update({
+    const updated = await this.prisma.courseReview.update({
       where: { id },
       data: { status },
     });
+
+    await this.recalculateCourseRating(updated.courseId);
+    return updated;
+  }
+
+  /**
+   * Recalculates and updates the Course.ratingAverage based on all APPROVED reviews
+   */
+  private async recalculateCourseRating(courseId: string) {
+    try {
+      const agg = await this.prisma.courseReview.aggregate({
+        where: { courseId, status: "APPROVED" },
+        _avg: { rating: true },
+      });
+
+      const avgRating = agg._avg.rating ? Number(agg._avg.rating.toFixed(1)) : 0;
+
+      await this.prisma.course.update({
+        where: { id: courseId },
+        data: { ratingAverage: avgRating },
+      });
+    } catch (err) {
+      console.error("Failed to recalculate course rating:", err);
+    }
   }
 
   async getReviewsByUser(userId: string) {

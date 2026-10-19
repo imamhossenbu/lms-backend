@@ -32,6 +32,8 @@ import { AnalyticsModule } from "./analytics/analytics.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 
+import { EnrollmentModule } from "./enrollment/enrollment.module";
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -51,6 +53,7 @@ import { APP_GUARD } from "@nestjs/core";
     LessonResourceModule,
     OrderModule,
     PaymentModule,
+    EnrollmentModule,
     LessonProgressModule,
     QuizModule,
     AssignmentModule,
