@@ -85,6 +85,7 @@ export class AuthService {
       },
       data: {
         emailVerified: true,
+        status: "ACTIVE",
         verificationToken: null,
       },
     });

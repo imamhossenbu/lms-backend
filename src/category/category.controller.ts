@@ -17,11 +17,11 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { FileInterceptor } from "@nestjs/platform-express";
 
 @Controller("categories")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")
   @UseInterceptors(FileInterceptor("icon"))
   async create(
@@ -37,6 +37,7 @@ export class CategoryController {
   }
 
   @Patch(":id")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")
   @UseInterceptors(FileInterceptor("icon"))
   async update(
