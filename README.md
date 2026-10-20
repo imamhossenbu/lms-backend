@@ -61,6 +61,8 @@ A comprehensive, scalable, enterprise-grade backend for modern **Learning Manage
 
 ### 📚 2. Course & Curriculum Architecture
 - **Hierarchical Course Structure:** Categories $\rightarrow$ Courses $\rightarrow$ Course Modules $\rightarrow$ Lessons $\rightarrow$ Downloadable Resources.
+- **Cloud Media Ingestion Pipeline:** Dedicated endpoints for device-to-cloud thumbnail uploads (`POST /courses/upload-thumbnail`) and multimedia streaming (`POST /courses/upload-media`) using **Cloudinary CDN** with automatic resource type detection (`image`, `video`, `raw` docs).
+- **Rich Lesson Content & Multimedia:** Lessons support rich text/HTML instructions (`content`), Cloudinary or external video streams (`videoUrl`), downloadable attachments (`resources`), and `isPreview` toggle flags.
 - **Search, Filtering & Pagination:** Full-text search (`?search=...`), category filtering, level filtering, price range (`minPrice`/`maxPrice`), free course filters, sorting (`popular`, `rating`, `priceAsc`, `priceDesc`), and paginated response schemas.
 - **Preview & Enrollment Guards:** Free preview lesson support, conditional module locking, and access restriction blocking non-enrolled students from paid lessons.
 - **Auto Duration Tracking:** `DurationService` dynamically rolls up lesson durations to module and course totals.
@@ -411,6 +413,8 @@ Authorization: Bearer <your_jwt_token>
 | `POST` | `/courses` | `ADMIN`, `TEACHER` | Create course with Cloudinary thumbnail |
 | `PATCH` | `/courses/:id` | `ADMIN`, `TEACHER` | Update course details and thumbnail |
 | `DELETE` | `/courses/:id` | `ADMIN`, `TEACHER` | Delete a course |
+| `POST` | `/courses/upload-thumbnail` | `ADMIN`, `TEACHER` | Upload course thumbnail directly to Cloudinary CDN (`multipart/form-data`) |
+| `POST` | `/courses/upload-media` | `ADMIN`, `TEACHER` | Upload lesson video, document, or audio to Cloudinary CDN (`auto` streaming) |
 
 ### 4. Enrollments & Student Dashboard
 | Method | Endpoint | Access | Description |
@@ -422,13 +426,13 @@ Authorization: Bearer <your_jwt_token>
 ### 5. Curriculum (Modules & Lessons)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `GET` | `/courses/:courseId/modules` | Public / Enrolled | Fetch all modules for a course |
-| `POST` | `/courses/:courseId/modules` | `ADMIN`, `TEACHER` | Create a curriculum module |
-| `PATCH` | `/courses/:courseId/modules/:id` | `ADMIN`, `TEACHER` | Update module details or order |
+| `GET` | `/courses/:courseId/modules` | Public / Enrolled | Fetch all modules with nested lessons for a course |
+| `POST` | `/courses/:courseId/modules` | `ADMIN`, `TEACHER` | Create a curriculum module (title, order, isLocked) |
+| `PATCH` | `/courses/:courseId/modules/:id` | `ADMIN`, `TEACHER` | Update module details or reorder |
 | `DELETE` | `/courses/:courseId/modules/:id` | `ADMIN`, `TEACHER` | Delete module |
 | `GET` | `/lessons/:id` | Enrolled / Preview | Fetch lesson content with **Enrollment Access Guard** |
-| `POST` | `/lessons` | `ADMIN`, `TEACHER` | Create lesson (video, text, preview flag) |
-| `PATCH` | `/lessons/:id` | `ADMIN`, `TEACHER` | Update lesson details |
+| `POST` | `/lessons` | `ADMIN`, `TEACHER` | Create lesson (`title`, `type`, `durationMinutes`, `content`, `videoUrl`, `resources`, `isPreview`) |
+| `PATCH` | `/lessons/:id` | `ADMIN`, `TEACHER` | Update lesson content, video link, and metadata |
 | `DELETE` | `/lessons/:id` | `ADMIN`, `TEACHER` | Delete lesson |
 | `POST` | `/lession-resource` | `ADMIN`, `TEACHER` | Upload downloadable lesson resources |
 | `GET` | `/lession-resource/:lessonId` | Enrolled | Fetch lesson downloadable attachments |
