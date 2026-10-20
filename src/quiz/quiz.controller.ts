@@ -25,10 +25,29 @@ export class QuizController {
     return this.quizService.createQuiz(body);
   }
 
+  @Get("lesson/:lessonId")
+  @UseGuards(AuthGuard("jwt"))
+  async getByLesson(@Req() req: any, @Param("lessonId") lessonId: string) {
+    return this.quizService.getQuizByLesson(lessonId, req.user?.role);
+  }
+
+  @Get("course/:courseId")
+  @UseGuards(AuthGuard("jwt"))
+  async getByCourse(@Param("courseId") courseId: string) {
+    return this.quizService.getQuizzesByCourse(courseId);
+  }
+
   @Get(":quizId")
   @UseGuards(AuthGuard("jwt"))
   async getQuiz(@Req() req: any, @Param("quizId") quizId: string) {
     return this.quizService.getQuiz(quizId, req.user?.role);
+  }
+
+  @Patch(":quizId")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  async update(@Param("quizId") quizId: string, @Body() body: any) {
+    return this.quizService.updateQuiz(quizId, body);
   }
 
   @Get(":quizId/my-attempts")

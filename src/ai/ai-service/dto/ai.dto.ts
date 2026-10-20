@@ -40,6 +40,14 @@ export class GenerateQuizDto {
   @IsString()
   @IsOptional()
   difficulty?: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" = "INTERMEDIATE";
+
+  @IsString()
+  @IsOptional()
+  lessonContent?: string;
+
+  @IsString()
+  @IsOptional()
+  lessonTitle?: string;
 }
 
 export class GenerateCourseOutlineDto {

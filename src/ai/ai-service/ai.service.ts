@@ -321,8 +321,19 @@ Be clear, accurate, and format responses with clean markdown when helpful.`;
     const num = dto.numQuestions || 5;
     const difficulty = dto.difficulty || "INTERMEDIATE";
 
+    let contextSection = "";
+    if (dto.lessonContent) {
+      // Strip any excessive HTML tags if it's rich text
+      const cleanContent = dto.lessonContent
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 10000);
+      contextSection = `\nReference Lesson Material (${dto.lessonTitle || dto.topic}):\n"""\n${cleanContent}\n"""\nCRITICAL INSTRUCTION: Every question, option, and explanation MUST be strictly grounded in and test knowledge from the reference lesson material provided above. Do NOT introduce external or unrelated facts.`;
+    }
+
     const prompt = `Generate ${num} multiple choice questions (MCQ) on the topic: "${dto.topic}".
-Difficulty level: ${difficulty}.
+Difficulty level: ${difficulty}.${contextSection}
 
 Return ONLY a valid JSON object in this exact schema without any markdown formatting or extra text:
 {
@@ -333,13 +344,13 @@ Return ONLY a valid JSON object in this exact schema without any markdown format
       "question": "The question string",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctAnswer": "The exact correct option string",
-      "explanation": "Brief explanation of why this answer is correct",
+      "explanation": "Brief explanation of why this answer is correct based on the lesson",
       "marks": 1
     }
   ]
 }`;
 
-    const raw = await this.generateText(prompt, "You are an expert exam question creator.", true);
+    const raw = await this.generateText(prompt, "You are an expert exam question creator and educational assessment designer.", true);
     try {
       return JSON.parse(raw);
     } catch {
