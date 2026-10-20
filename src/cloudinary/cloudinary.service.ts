@@ -81,7 +81,33 @@ export class CloudinaryService {
             }
           },
         )
-        .end(buffer); 
+        .end(buffer);
+    });
+  }
+
+  async uploadMedia(
+    file: Express.Multer.File,
+    folder: string = "lessons",
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            folder,
+            resource_type: "auto",
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            if (result && result.secure_url) {
+              resolve(result.secure_url);
+            } else {
+              reject(
+                new Error("Cloudinary upload failed: No secure_url returned."),
+              );
+            }
+          },
+        )
+        .end(file.buffer);
     });
   }
 }

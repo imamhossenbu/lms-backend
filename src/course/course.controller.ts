@@ -38,6 +38,18 @@ export class CourseController {
     return { url };
   }
 
+  @Post("upload-media")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  @UseInterceptors(FileInterceptor("file"))
+  async uploadMedia(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException("No file provided");
+    }
+    const url = await this.courseService.uploadMedia(file);
+    return { url };
+  }
+
   @Post()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
