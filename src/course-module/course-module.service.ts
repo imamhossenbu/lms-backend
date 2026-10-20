@@ -9,12 +9,22 @@ export class CourseModuleService {
   async create(courseId: string, dto: CreateModuleDto) {
     return await this.prisma.courseModule.create({
       data: { ...dto, courseId },
+      include: {
+        lessons: {
+          orderBy: { order: "asc" },
+        },
+      },
     });
   }
 
   async findAllByCourse(courseId: string) {
     return await this.prisma.courseModule.findMany({
       where: { courseId },
+      include: {
+        lessons: {
+          orderBy: { order: "asc" },
+        },
+      },
       orderBy: { order: "asc" },
     });
   }

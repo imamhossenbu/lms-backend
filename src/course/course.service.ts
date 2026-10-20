@@ -15,6 +15,10 @@ export class CourseService {
     private cloudinary: CloudinaryService,
   ) {}
 
+  async uploadThumbnail(file: Express.Multer.File): Promise<string> {
+    return await this.cloudinary.uploadImage(file);
+  }
+
   async create(
     dto: CreateCourseDto,
     instructorId: string,

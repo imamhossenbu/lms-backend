@@ -11,6 +11,7 @@ import {
   Param,
   Delete,
   Query,
+  BadRequestException,
 } from "@nestjs/common";
 import { CourseService } from "./course.service";
 import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
@@ -24,6 +25,18 @@ import { RequestWithUser } from "../auth/interfaces/request.interface";
 @Controller("courses")
 export class CourseController {
   constructor(private readonly courseService: CourseService) {}
+
+  @Post("upload-thumbnail")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  @UseInterceptors(FileInterceptor("file"))
+  async uploadThumbnail(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException("No image file provided");
+    }
+    const url = await this.courseService.uploadThumbnail(file);
+    return { url };
+  }
 
   @Post()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
