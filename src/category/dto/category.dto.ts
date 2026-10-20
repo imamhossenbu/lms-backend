@@ -19,6 +19,10 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
 }
 
 export class UpdateCategoryDto {

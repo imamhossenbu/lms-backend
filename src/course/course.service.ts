@@ -20,7 +20,7 @@ export class CourseService {
     instructorId: string,
     file?: Express.Multer.File,
   ) {
-    let thumbnailUrl: string | undefined = undefined;
+    let thumbnailUrl: string | undefined = dto.thumbnail;
     if (file) {
       thumbnailUrl = await this.cloudinary.uploadImage(file);
     }
@@ -30,7 +30,7 @@ export class CourseService {
         ...dto,
         instructorId,
         thumbnail: thumbnailUrl,
-        status: "DRAFT",
+        status: dto.status || "DRAFT",
         price: Number(dto.price),
         durationMinutes: Number(dto.durationMinutes),
       },

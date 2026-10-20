@@ -18,6 +18,8 @@ export class CreateCourseDto {
   @IsNumber() price!: number;
   @IsBoolean() @IsOptional() isFree?: boolean;
   @IsNumber() @IsNotEmpty() durationMinutes!: number;
+  @IsOptional() @IsString() thumbnail?: string;
+  @IsOptional() @IsString() status?: string;
   @IsOptional() requirements?: string;
   @IsOptional() learningOutcomes?: string;
   @IsOptional() tags?: string;

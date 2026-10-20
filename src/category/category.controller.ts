@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -46,5 +47,12 @@ export class CategoryController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.categoryService.update(id, dto, file);
+  }
+
+  @Delete(":id")
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN")
+  async delete(@Param("id") id: string) {
+    return this.categoryService.delete(id);
   }
 }

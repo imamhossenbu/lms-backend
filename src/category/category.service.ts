@@ -11,7 +11,7 @@ export class CategoryService {
   ) {}
 
   async create(dto: CreateCategoryDto, file?: Express.Multer.File) {
-    let iconUrl: string | undefined = undefined;
+    let iconUrl: string | undefined = dto.icon;
     if (file) {
       iconUrl = await this.cloudinary.uploadImage(file);
     }
@@ -21,7 +21,14 @@ export class CategoryService {
   }
 
   async findAll() {
-    return await this.prisma.category.findMany();
+    return await this.prisma.category.findMany({
+      include: {
+        _count: {
+          select: { courses: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
   }
 
   async update(id: string, dto: UpdateCategoryDto, file?: Express.Multer.File) {
@@ -32,6 +39,12 @@ export class CategoryService {
     return await this.prisma.category.update({
       where: { id },
       data: { ...dto, ...(iconUrl && { icon: iconUrl }) },
+    });
+  }
+
+  async delete(id: string) {
+    return await this.prisma.category.delete({
+      where: { id },
     });
   }
 }
