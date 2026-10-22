@@ -122,7 +122,9 @@ export class MailService {
   // ===============================
 
   async sendVerificationEmail(email: string, token: string) {
-    const url = `http://localhost:4000/auth/verify?token=${token}`;
+    const frontendUrl =
+      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
+    const url = `${frontendUrl}/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
 
     const content = `
       <tr>
@@ -130,7 +132,7 @@ export class MailService {
 
           <div style="
             width: 48px; height: 48px;
-            background: #eeecfe;
+            background: #FFF4ED;
             border-radius: 10px;
             font-size: 22px;
             line-height: 48px;
@@ -147,18 +149,36 @@ export class MailService {
           ">Verify your email</h1>
 
           <p style="
-            margin: 0 0 28px 0;
+            margin: 0 0 20px 0;
             color: #52525b;
             font-size: 15px;
             line-height: 1.7;
           ">
-            Welcome aboard! Click the button below to confirm your
-            email address and activate your LMS account.
+            Welcome to EduPro LMS! Enter the 6-digit verification code below on the verification page, or click the direct button to activate your account.
           </p>
+
+          <div style="
+            text-align: center;
+            background: #FFF4ED;
+            border: 1.5px dashed #FF5B00;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+          ">
+            <span style="
+              display: inline-block;
+              font-size: 32px;
+              font-weight: 800;
+              letter-spacing: 6px;
+              color: #FF5B00;
+              font-family: monospace;
+            ">${token}</span>
+            <p style="margin: 6px 0 0 0; color: #71717a; font-size: 12px;">6-digit verification code</p>
+          </div>
 
           <table cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
             <tr>
-              <td style="background: #534AB7; border-radius: 8px;">
+              <td style="background: #FF5B00; border-radius: 8px;">
                 <a href="${url}" style="
                   display: inline-block;
                   padding: 13px 28px;
@@ -312,7 +332,9 @@ export class MailService {
   // ===============================
 
   async sendResetPasswordEmail(email: string, token: string) {
-    const url = `http://localhost:4000/auth/reset-password?token=${token}`;
+    const frontendUrl =
+      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
+    const url = `${frontendUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
     const content = `
       <tr>
@@ -320,7 +342,7 @@ export class MailService {
 
           <div style="
             width: 48px; height: 48px;
-            background: #f0fdf4;
+            background: #FFF4ED;
             border-radius: 10px;
             font-size: 22px;
             line-height: 48px;
@@ -337,18 +359,37 @@ export class MailService {
           ">Reset your password</h1>
 
           <p style="
-            margin: 0 0 28px 0;
+            margin: 0 0 20px 0;
             color: #52525b;
             font-size: 15px;
             line-height: 1.7;
           ">
-            We received a request to reset the password for your LMS account.
-            Click the button below to choose a new password.
+            We received a request to reset the password for your EduPro LMS account.
+            Click the button below to choose a new password, or use the 6-digit verification code.
           </p>
+
+          <div style="
+            text-align: center;
+            background: #FFF4ED;
+            border: 1.5px dashed #FF5B00;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+          ">
+            <span style="
+              display: inline-block;
+              font-size: 32px;
+              font-weight: 800;
+              letter-spacing: 6px;
+              color: #FF5B00;
+              font-family: monospace;
+            ">${token}</span>
+            <p style="margin: 6px 0 0 0; color: #71717a; font-size: 12px;">Reset security code</p>
+          </div>
 
           <table cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
             <tr>
-              <td style="background: #16a34a; border-radius: 8px;">
+              <td style="background: #FF5B00; border-radius: 8px;">
                 <a href="${url}" style="
                   display: inline-block;
                   padding: 13px 28px;

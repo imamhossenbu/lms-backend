@@ -15,6 +15,7 @@ import {
   LoginDto,
   ChangePasswordDto,
   ResetPasswordDto,
+  VerifyEmailDto,
 } from "./dto/auth.dto";
 
 import { MailService } from "./mail/mail.service";
@@ -42,7 +43,8 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
-    const token = Math.random().toString(36).substring(2);
+    // Generate 6-digit numeric verification OTP
+    const token = Math.floor(100000 + Math.random() * 900000).toString();
 
     const user = await this.prisma.user.create({
       data: {
@@ -63,11 +65,12 @@ export class AuthService {
 
     return {
       message:
-        "Registration successful. Please check your email for verification.",
+        "Registration successful. Please check your email for the 6-digit verification code.",
+      email: user.email,
     };
   }
 
-  // VERIFY EMAIL
+  // VERIFY EMAIL (Direct token query or link click)
   async verifyEmail(token: string) {
     const user = await this.prisma.user.findUnique({
       where: {
@@ -76,7 +79,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException("Invalid verification token");
+      throw new NotFoundException("Invalid or expired verification token");
     }
 
     return await this.prisma.user.update({
@@ -89,6 +92,74 @@ export class AuthService {
         verificationToken: null,
       },
     });
+  }
+
+  // VERIFY 6-DIGIT CODE (From verify-email OTP frontend input)
+  async verifyCode(dto: VerifyEmailDto) {
+    const cleanCode = dto.code.trim();
+    let user: any = null;
+
+    if (dto.email) {
+      user = await this.prisma.user.findUnique({
+        where: { email: dto.email.trim() },
+      });
+    }
+
+    if (!user) {
+      user = await this.prisma.user.findFirst({
+        where: { verificationToken: cleanCode },
+      });
+    }
+
+    if (!user || user.verificationToken !== cleanCode) {
+      throw new BadRequestException("Invalid or expired 6-digit verification code");
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        status: user.status === "PENDING" ? "ACTIVE" : user.status,
+        verificationToken: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: "Email verified successfully! You may now access your dashboard.",
+    };
+  }
+
+  // RESEND VERIFICATION CODE
+  async resendVerification(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.trim() },
+    });
+
+    if (!user) {
+      throw new NotFoundException("Account with this email does not exist");
+    }
+
+    // Generate fresh 6-digit numeric OTP code
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationToken: newCode,
+      },
+    });
+
+    try {
+      await this.mailService.sendVerificationEmail(user.email, newCode);
+    } catch (err: any) {
+      console.error("Resend Mail Error:", err.message);
+    }
+
+    return {
+      success: true,
+      message: "A fresh 6-digit verification code has been dispatched to your email",
+    };
   }
 
   // LOGIN
@@ -183,15 +254,16 @@ export class AuthService {
   async forgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({
       where: {
-        email,
+        email: email.trim(),
       },
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException("User not found with this email");
     }
 
-    const resetToken = Math.random().toString(36).substring(2);
+    // Generate 6-digit numeric security code
+    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
 
     await this.prisma.user.update({
       where: {
@@ -210,20 +282,31 @@ export class AuthService {
     }
 
     return {
-      message: "Reset link sent to your email",
+      success: true,
+      message: "Password reset code and link dispatched to your email",
+      email: user.email,
     };
   }
 
   // RESET PASSWORD
   async resetPassword(dto: ResetPasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        verificationToken: dto.token,
-      },
-    });
+    const cleanToken = dto.token.trim();
+    let user: any = null;
+
+    if (dto.email) {
+      user = await this.prisma.user.findUnique({
+        where: { email: dto.email.trim() },
+      });
+    }
 
     if (!user) {
-      throw new NotFoundException("Invalid or expired token");
+      user = await this.prisma.user.findFirst({
+        where: { verificationToken: cleanToken },
+      });
+    }
+
+    if (!user || user.verificationToken !== cleanToken) {
+      throw new NotFoundException("Invalid or expired reset token/code");
     }
 
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
@@ -238,8 +321,18 @@ export class AuthService {
       },
     });
 
+    try {
+      await this.mailService.sendSecurityAlertEmail(
+        user.email,
+        "reset using verification code",
+      );
+    } catch (error: any) {
+      console.log("MAIL ERROR:", error.message);
+    }
+
     return {
-      message: "Password reset successful",
+      success: true,
+      message: "Password reset successfully! You can now sign in with your new password.",
     };
   }
 }
