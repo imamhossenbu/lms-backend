@@ -100,8 +100,10 @@ export class AuthService {
     let user: any = null;
 
     if (dto.email) {
-      user = await this.prisma.user.findUnique({
-        where: { email: dto.email.trim() },
+      user = await this.prisma.user.findFirst({
+        where: {
+          email: { equals: dto.email.trim(), mode: "insensitive" },
+        },
       });
     }
 
@@ -113,6 +115,22 @@ export class AuthService {
 
     if (!user || user.verificationToken !== cleanCode) {
       throw new BadRequestException("Invalid or expired 6-digit verification code");
+    }
+
+    if (dto.purpose === "reset-password") {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: "Code verified successfully! Proceed to reset your password.",
+        resetToken: cleanCode,
+        email: user.email,
+      };
     }
 
     await this.prisma.user.update({
@@ -132,8 +150,10 @@ export class AuthService {
 
   // RESEND VERIFICATION CODE
   async resendVerification(email: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.trim() },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: { equals: email.trim(), mode: "insensitive" },
+      },
     });
 
     if (!user) {
@@ -252,9 +272,9 @@ export class AuthService {
 
   // FORGOT PASSWORD
   async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findFirst({
       where: {
-        email: email.trim(),
+        email: { equals: email.trim(), mode: "insensitive" },
       },
     });
 
@@ -294,8 +314,10 @@ export class AuthService {
     let user: any = null;
 
     if (dto.email) {
-      user = await this.prisma.user.findUnique({
-        where: { email: dto.email.trim() },
+      user = await this.prisma.user.findFirst({
+        where: {
+          email: { equals: dto.email.trim(), mode: "insensitive" },
+        },
       });
     }
 

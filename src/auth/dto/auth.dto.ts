@@ -51,6 +51,10 @@ export class VerifyEmailDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  purpose?: string;
 }
 
 export class ResendVerificationDto {
