@@ -323,40 +323,45 @@ export class AuthService {
   async resetPassword(dto: ResetPasswordDto) {
     const cleanToken = dto.token.trim();
     let user: any = null;
+    let isTokenVerified = false;
 
-    // 1. Try decoding as signed JWT reset session token
+    // 1. Try resolving via signed JWT reset session token
     try {
       const decoded: any = this.jwt.verify(cleanToken);
-      if (decoded?.sub && (decoded?.purpose === "reset-password" || decoded?.email)) {
+      if (decoded?.sub) {
         user = await this.prisma.user.findUnique({
           where: { id: decoded.sub },
         });
+        if (user) {
+          isTokenVerified = true;
+        }
       }
     } catch {
       // Not a JWT, check via verificationToken/email below
     }
 
-    // 2. If not found by JWT, find by email or verificationToken
-    if (!user && dto.email) {
-      user = await this.prisma.user.findFirst({
-        where: {
-          email: { equals: dto.email.trim(), mode: "insensitive" },
-        },
-      });
+    // 2. If not verified by JWT, verify by 6-digit OTP code (cleanToken)
+    if (!isTokenVerified) {
+      if (dto.email) {
+        user = await this.prisma.user.findFirst({
+          where: {
+            email: { equals: dto.email.trim(), mode: "insensitive" },
+          },
+        });
+      }
+
+      if (!user) {
+        user = await this.prisma.user.findFirst({
+          where: { verificationToken: cleanToken },
+        });
+      }
+
+      if (user && user.verificationToken === cleanToken) {
+        isTokenVerified = true;
+      }
     }
 
-    if (!user) {
-      user = await this.prisma.user.findFirst({
-        where: { verificationToken: cleanToken },
-      });
-    }
-
-    if (!user) {
-      throw new NotFoundException("Invalid or expired reset token/code");
-    }
-
-    // 3. If token is not JWT, verify verificationToken matches
-    if (user.verificationToken && user.verificationToken !== cleanToken) {
+    if (!user || !isTokenVerified) {
       throw new NotFoundException("Invalid or expired reset token/code");
     }
 
