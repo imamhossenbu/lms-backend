@@ -118,17 +118,28 @@ export class AuthService {
     }
 
     if (dto.purpose === "reset-password") {
+      const resetSessionToken = this.jwt.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          purpose: "reset-password",
+        },
+        { expiresIn: "15m" },
+      );
+
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
           emailVerified: true,
+          verificationToken: cleanCode,
         },
       });
 
       return {
         success: true,
         message: "Code verified successfully! Proceed to reset your password.",
-        resetToken: cleanCode,
+        resetToken: resetSessionToken,
+        code: cleanCode,
         email: user.email,
       };
     }
@@ -313,7 +324,20 @@ export class AuthService {
     const cleanToken = dto.token.trim();
     let user: any = null;
 
-    if (dto.email) {
+    // 1. Try decoding as signed JWT reset session token
+    try {
+      const decoded: any = this.jwt.verify(cleanToken);
+      if (decoded?.sub && (decoded?.purpose === "reset-password" || decoded?.email)) {
+        user = await this.prisma.user.findUnique({
+          where: { id: decoded.sub },
+        });
+      }
+    } catch {
+      // Not a JWT, check via verificationToken/email below
+    }
+
+    // 2. If not found by JWT, find by email or verificationToken
+    if (!user && dto.email) {
       user = await this.prisma.user.findFirst({
         where: {
           email: { equals: dto.email.trim(), mode: "insensitive" },
@@ -327,7 +351,12 @@ export class AuthService {
       });
     }
 
-    if (!user || user.verificationToken !== cleanToken) {
+    if (!user) {
+      throw new NotFoundException("Invalid or expired reset token/code");
+    }
+
+    // 3. If token is not JWT, verify verificationToken matches
+    if (user.verificationToken && user.verificationToken !== cleanToken) {
       throw new NotFoundException("Invalid or expired reset token/code");
     }
 
