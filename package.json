@@ -6,7 +6,10 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/main.js",
-    "dev": "ts-node src/main.ts"
+    "dev": "ts-node src/main.ts",
+    "test": "jest --preset ts-jest --testEnvironment node --testPathIgnorePatterns /dist/ /node_modules/",
+    "saas:make-owner": "ts-node src/saas/scripts/make-owner.ts",
+    "db:push": "prisma db push"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

@@ -233,6 +233,7 @@ export class AuthService {
         sub: user.id,
         email: user.email,
         role: user.role,
+        institutionId: user.institutionId ?? null,
       }),
     };
   }

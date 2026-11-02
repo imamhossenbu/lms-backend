@@ -33,6 +33,12 @@ model User {
   emailVerified Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  // SaaS tenant this user belongs to (null for the platform owner / legacy users)
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  @@index([institutionId])
 }
 
 // --- Courses & Learning ---
@@ -528,4 +534,220 @@ model Setting {
   updatedAt          DateTime @updatedAt
 
 @@map("settings")
+}
+
+
+// =====================================================================
+// --- SaaS layer (multi-tenant subscriptions) ---
+// Mirrors the frontend contract in lms-admin-panel/src/types/saas.ts.
+// =====================================================================
+
+enum SaasBillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SaasSubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  SUSPENDED
+}
+
+enum SaasInvoiceStatus {
+  PAID
+  OPEN
+  FAILED
+  REFUNDED
+  VOID
+}
+
+enum CustomDomainStatus {
+  PENDING_DNS
+  VERIFIED
+  FAILED
+}
+
+enum InstitutionType {
+  SCHOOL
+  COACHING
+  UNIVERSITY
+  COMPANY
+  CREATOR
+}
+
+enum InstitutionSource {
+  SELF_SIGNUP
+  OWNER_CREATED
+}
+
+enum SaasEventType {
+  SIGNED_UP
+  TRIAL_STARTED
+  TRIAL_CONVERTED
+  TRIAL_EXPIRED
+  PLAN_UPGRADED
+  PLAN_DOWNGRADED
+  CYCLE_CHANGED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  CANCELLED
+  REACTIVATED
+  SUSPENDED
+  DOMAIN_ADDED
+  DOMAIN_VERIFIED
+  NOTE
+}
+
+enum SaasActor {
+  Owner
+  Institution
+  System
+}
+
+/// A pricing plan: built-in tiers ("starter" … "enterprise") or owner-created custom plans ("plan-<slug>").
+model SaasPlan {
+  id               String   @id
+  name             String   @unique
+  tagline          String
+  /// USD per month. 0 = custom pricing ("Contact sales").
+  priceMonthly     Decimal  @db.Decimal(12, 2)
+  /// USD per year. 0 = custom pricing.
+  priceYearly      Decimal  @db.Decimal(12, 2)
+  /// Limits — null = unlimited.
+  limitStudents    Int?
+  limitCourses     Int?
+  limitTeamMembers Int?
+  limitStorageGb   Int?
+  features         String[]
+  highlighted      Boolean  @default(false)
+  isPublic         Boolean  @default(true)
+  trialDays        Int      @default(14)
+  archived         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  institutions Institution[]
+  invoices     SaasInvoice[]
+
+  @@map("saas_plans")
+}
+
+/// One tenant. Carries exactly one subscription (flattened `sub*` columns).
+model Institution {
+  id           String            @id @default(uuid())
+  name         String
+  slug         String            @unique
+  logoInitials String
+  tone         String            @default("orange")
+  type         InstitutionType
+  country      String
+  ownerName    String
+  ownerEmail   String
+  phone        String            @default("")
+  notes        String            @default("")
+  source       InstitutionSource @default(OWNER_CREATED)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  lastActiveAt DateTime          @default(now())
+
+  // usage counters (kept in sync by the LMS modules once tenancy is wired)
+  usageStudents    Int   @default(0)
+  usageCourses     Int   @default(0)
+  usageTeamMembers Int   @default(1)
+  usageStorageGb   Float @default(0)
+
+  // subscription
+  planId              String
+  plan                SaasPlan                @relation(fields: [planId], references: [id])
+  cycle               SaasBillingCycle        @default(MONTHLY)
+  status              SaasSubscriptionStatus
+  startedAt           DateTime                @default(now())
+  trialEndsAt         DateTime?
+  currentPeriodStart  DateTime
+  currentPeriodEnd    DateTime
+  cancelAtPeriodEnd   Boolean                 @default(false)
+  cancelledAt         DateTime?
+  suspendedAt         DateTime?
+  suspendedReason     String?
+  statusBeforeSuspend SaasSubscriptionStatus?
+  /// Negotiated price PER BILLING CYCLE — overrides the plan price when set.
+  customPrice         Decimal?                @db.Decimal(12, 2)
+  paymentBrand        String?
+  paymentLast4        String?
+
+  customDomain CustomDomain?
+  invoices     SaasInvoice[]
+  events       SaasEvent[]
+  users        User[]
+
+  @@index([status])
+  @@index([planId])
+  @@index([ownerEmail])
+  @@map("institutions")
+}
+
+model CustomDomain {
+  id            String             @id @default(uuid())
+  institutionId String             @unique
+  institution   Institution        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  domain        String             @unique
+  status        CustomDomainStatus @default(PENDING_DNS)
+  addedAt       DateTime           @default(now())
+  verifiedAt    DateTime?
+  dnsTarget     String
+  txtToken      String
+  lastCheckedAt DateTime?
+
+  @@map("custom_domains")
+}
+
+model SaasInvoice {
+  id            String            @id @default(uuid())
+  /// e.g. "EDP-2026-00123"
+  number        String            @unique
+  institutionId String
+  institution   Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          SaasPlan          @relation(fields: [planId], references: [id])
+  cycle         SaasBillingCycle
+  amount        Decimal           @db.Decimal(12, 2)
+  tax           Decimal           @db.Decimal(12, 2)
+  total         Decimal           @db.Decimal(12, 2)
+  status        SaasInvoiceStatus
+  issuedAt      DateTime          @default(now())
+  dueAt         DateTime
+  paidAt        DateTime?
+  periodStart   DateTime
+  periodEnd     DateTime
+  description   String?
+
+  @@index([institutionId, status])
+  @@index([status])
+  @@index([issuedAt])
+  @@map("saas_invoices")
+}
+
+/// Per-institution lifecycle timeline.
+model SaasEvent {
+  id            String        @id @default(uuid())
+  institutionId String
+  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  type          SaasEventType
+  message       String
+  actor         SaasActor     @default(Owner)
+  at            DateTime      @default(now())
+
+  @@index([institutionId, at])
+  @@index([at])
+  @@map("saas_events")
+}
+
+/// Atomic counters (e.g. invoice numbers per year: key "invoice-2026").
+model SaasCounter {
+  key   String @id
+  value Int    @default(0)
+
+  @@map("saas_counters")
 }

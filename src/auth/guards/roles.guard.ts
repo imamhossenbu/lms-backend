@@ -7,7 +7,11 @@ export class RolesGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     // Get the required roles from the metadata
-    const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
+    // Method-level @Roles wins; otherwise fall back to a class-level @Roles on the controller.
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>('roles', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     
     if (!requiredRoles) return true; 
 

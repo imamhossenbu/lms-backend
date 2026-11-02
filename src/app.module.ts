@@ -33,6 +33,7 @@ import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 
 import { EnrollmentModule } from "./enrollment/enrollment.module";
+import { SaasModule } from "./saas/saas.module";
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { EnrollmentModule } from "./enrollment/enrollment.module";
     AiSettingsModule,
     AiModule,
     AnalyticsModule,
+    SaasModule,
   ],
   providers: [
     {

@@ -16,7 +16,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       userId: payload.sub,
       email: payload.email,
-      role: payload.role, 
+      role: payload.role,
+      // SaaS tenant claims (set for institution users and owner impersonation tokens)
+      institutionId: payload.institutionId ?? null,
+      impersonatedBy: payload.impersonatedBy ?? null,
     };
   }
 }
