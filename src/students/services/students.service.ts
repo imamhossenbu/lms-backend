@@ -1,8 +1,8 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
-import { randomInt } from "crypto";
 import type { Prisma, User } from "../../../generated/prisma";
 import { MailService } from "../../auth/mail/mail.service";
+import { assertEmailFree, BCRYPT_ROUNDS, generatePassword } from "../../common/accounts";
 import { type AuthUser, tenantWhere } from "../../common/auth-user";
 import { paginated, skipTake, type Paginated } from "../../common/pagination";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -11,21 +11,6 @@ import { STATUS_FROM_LABEL, STATUS_LABEL, STATUSES_FOR_LABEL, STUDENT_ROLE, stud
 import type { StudentDetails, StudentListItem, StudentStatusLabel } from "../students.types";
 import { StudentEnrollmentsService } from "./student-enrollments.service";
 import { StudentProgressService, type StudentSummary } from "./student-progress.service";
-
-const BCRYPT_ROUNDS = 10;
-
-/** Random 12-char password with upper, lower, digit and symbol (no look-alike characters). */
-function generatePassword(length = 12): string {
-  const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*?"];
-  const all = sets.join("");
-  const chars = sets.map((set) => set[randomInt(set.length)]!);
-  while (chars.length < length) chars.push(all[randomInt(all.length)]!);
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
-    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
-  }
-  return chars.join("");
-}
 
 /** Admin panel › Students: list, details, create (with auto password + welcome email), edit, status, soft delete. */
 @Injectable()
@@ -105,21 +90,12 @@ export class StudentsService {
 
   // ---------------------------------------------------------------- writes
 
-  private async assertEmailFree(email: string, exceptId?: string) {
-    const existing = await this.prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" }, ...(exceptId ? { id: { not: exceptId } } : {}) },
-      select: { deletedAt: true },
-    });
-    if (!existing) return;
-    throw new ConflictException(existing.deletedAt ? "A deleted account still uses this email address." : "An account with this email already exists.");
-  }
-
   /**
    * Creates the student with a generated password, enrolls the selected courses (one transaction),
    * then emails the login details. Admin-created accounts are treated as email-verified.
    */
   async create(actor: AuthUser, dto: CreateStudentDto): Promise<StudentDetails> {
-    await this.assertEmailFree(dto.email);
+    await assertEmailFree(this.prisma, dto.email);
     const password = generatePassword();
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
@@ -141,7 +117,7 @@ export class StudentsService {
     });
 
     try {
-      await this.mail.sendStudentWelcomeEmail(student.email, student.name, password);
+      await this.mail.sendAccountWelcomeEmail(student.email, student.name, password, "student");
     } catch (err: any) {
       // The account exists either way; the admin can trigger a password reset if the email didn't arrive.
       this.logger.warn(`Welcome email to ${student.email} failed: ${err?.message ?? err}`);
@@ -151,7 +127,7 @@ export class StudentsService {
 
   async update(actor: AuthUser, id: string, dto: UpdateStudentDto): Promise<StudentDetails> {
     await this.mustFind(actor, id);
-    if (dto.email) await this.assertEmailFree(dto.email, id);
+    if (dto.email) await assertEmailFree(this.prisma, dto.email, id);
     await this.prisma.user.update({
       where: { id },
       data: {

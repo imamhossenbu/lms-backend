@@ -231,10 +231,10 @@ export class MailService {
   }
 
   // ===============================
-  // STUDENT WELCOME (admin-created account)
+  // ACCOUNT WELCOME (admin-created student / instructor)
   // ===============================
 
-  async sendStudentWelcomeEmail(email: string, name: string, password: string) {
+  async sendAccountWelcomeEmail(email: string, name: string, password: string, accountType: "student" | "instructor") {
     const frontendUrl = this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
     const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -243,7 +243,7 @@ export class MailService {
         <td style="padding: 32px 36px 24px 36px;">
           <h1 style="margin: 0 0 12px; font-size: 22px; color: #0F172A;">Welcome, ${escape(name)}!</h1>
           <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #334155;">
-            An account has been created for you. Sign in with the details below and change your password after your first login.
+            Your ${accountType} account has been created. Sign in with the details below and change your password after your first login.
           </p>
           <table cellpadding="0" cellspacing="0" style="width: 100%; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;">
             <tr><td style="padding: 16px 20px; font-size: 14px; color: #64748B;">Email</td>
@@ -260,7 +260,30 @@ export class MailService {
     await this.transporter.sendMail({
       from: `"${this.fromName}" <${this.fromEmail}>`,
       to: email,
-      subject: "Your student account is ready — LMS Platform",
+      subject: `Your ${accountType} account is ready — LMS Platform`,
+      html: this.wrapTemplate(content, "#F97316"),
+    });
+  }
+
+  // ===============================
+  // DIRECT MESSAGE FROM AN ADMIN
+  // ===============================
+
+  async sendAdminMessageEmail(email: string, recipientName: string, senderName: string, subject: string, body: string) {
+    const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 24px 36px;">
+          <p style="margin: 0 0 8px; font-size: 13px; color: #64748B;">Message from ${escape(senderName)}</p>
+          <h1 style="margin: 0 0 16px; font-size: 20px; color: #0F172A;">${escape(subject)}</h1>
+          <p style="margin: 0 0 16px; font-size: 15px; color: #334155;">Hi ${escape(recipientName)},</p>
+          <div style="font-size: 15px; line-height: 1.7; color: #334155; white-space: pre-line;">${escape(body)}</div>
+        </td>
+      </tr>`;
+    await this.transporter.sendMail({
+      from: `"${this.fromName}" <${this.fromEmail}>`,
+      to: email,
+      subject,
       html: this.wrapTemplate(content, "#F97316"),
     });
   }

@@ -28,6 +28,10 @@ model User {
   language      String?
   socialLinks   String?
   address       String?
+  /// Professional title shown on instructor profiles, e.g. "Senior Web Developer".
+  headline      String?
+  /// Main subject area, e.g. "Web Development".
+  expertise     String?
   certificates  Certificate[]
   attendances   Attendance[]
 
@@ -38,6 +42,11 @@ model User {
   coursesTeaching  Course[]        @relation("CourseInstructor")
   notesAbout       StudentNote[]   @relation("NoteStudent")
   notesAuthored    StudentNote[]   @relation("NoteAuthor")
+  instructorNotesAbout    InstructorNote[] @relation("InstructorNoteInstructor")
+  instructorNotesAuthored InstructorNote[] @relation("InstructorNoteAuthor")
+  reviews          CourseReview[]
+  orders           Order[]
+  liveClassesTaught LiveClass[]    @relation("LiveClassInstructor")
   /// Soft delete — hidden from lists and blocked from login.
   deletedAt        DateTime?
   emailVerified Boolean       @default(false)
@@ -93,6 +102,7 @@ model Course {
   quizzes        Quiz[]
   assignments    Assignment[]
   lessonProgress LessonProgress[]
+  liveClasses    LiveClass[]
 
   @@index([instructorId])
 }
@@ -283,11 +293,15 @@ model CourseReview {
   id         String   @id @default(uuid())
   courseId   String
   userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   rating     Int
   reviewText String?
   status     String
   createdAt  DateTime @default(now())
   course     Course   @relation(fields: [courseId], references: [id])
+
+  @@index([courseId, status])
+  @@index([userId])
 }
 
 model Certificate {
@@ -450,6 +464,7 @@ model Order {
   id          String @id @default(uuid())
   orderNumber String @unique
   userId      String
+  user        User   @relation(fields: [userId], references: [id])
   courseId    String
 
   course Course @relation(fields: [courseId], references: [id])
@@ -463,6 +478,9 @@ model Order {
   couponId       String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([courseId, status])
+  @@index([userId])
 }
 
 model Payment {
@@ -499,7 +517,9 @@ model Invoice {
 model LiveClass {
   id           String   @id @default(uuid())
   courseId     String
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   instructorId String
+  instructor   User     @relation("LiveClassInstructor", fields: [instructorId], references: [id])
   title        String
   description  String?
   meetingUrl   String
@@ -507,6 +527,9 @@ model LiveClass {
   endTime      DateTime
   recordingUrl String?
   status       String
+
+  @@index([instructorId, startTime])
+  @@index([courseId])
 }
 
 model Attendance {
@@ -823,4 +846,43 @@ model StudentNote {
 
   @@index([studentId, createdAt])
   @@map("student_notes")
+}
+
+
+// --- Instructor notes (admin panel › Instructor details › Notes) ---
+enum InstructorNoteType {
+  GENERAL
+  PERFORMANCE
+  CONTENT_UPDATE
+  ONBOARDING
+  MEETING
+  ISSUE
+  PAYMENT
+}
+
+enum NotePriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model InstructorNote {
+  id           String             @id @default(uuid())
+  instructorId String
+  instructor   User               @relation("InstructorNoteInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User               @relation("InstructorNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  title        String
+  /// Sanitized HTML from the rich text editor.
+  content      String
+  type         InstructorNoteType @default(GENERAL)
+  priority     NotePriority       @default(MEDIUM)
+  tags         String[]
+  /// Calendar date of the reminder (no time).
+  reminderDate DateTime?          @db.Date
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([instructorId, createdAt])
+  @@map("instructor_notes")
 }
