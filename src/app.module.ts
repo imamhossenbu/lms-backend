@@ -34,6 +34,7 @@ import { APP_GUARD } from "@nestjs/core";
 
 import { EnrollmentModule } from "./enrollment/enrollment.module";
 import { SaasModule } from "./saas/saas.module";
+import { StudentsModule } from "./students/students.module";
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { SaasModule } from "./saas/saas.module";
     AiModule,
     AnalyticsModule,
     SaasModule,
+    StudentsModule,
   ],
   providers: [
     {

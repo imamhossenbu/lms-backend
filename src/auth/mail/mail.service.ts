@@ -231,6 +231,41 @@ export class MailService {
   }
 
   // ===============================
+  // STUDENT WELCOME (admin-created account)
+  // ===============================
+
+  async sendStudentWelcomeEmail(email: string, name: string, password: string) {
+    const frontendUrl = this.configService.get<string>("FRONTEND_URL") || "http://localhost:3000";
+    const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 24px 36px;">
+          <h1 style="margin: 0 0 12px; font-size: 22px; color: #0F172A;">Welcome, ${escape(name)}!</h1>
+          <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #334155;">
+            An account has been created for you. Sign in with the details below and change your password after your first login.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="width: 100%; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;">
+            <tr><td style="padding: 16px 20px; font-size: 14px; color: #64748B;">Email</td>
+                <td style="padding: 16px 20px; font-size: 14px; color: #0F172A; font-weight: 600;">${escape(email)}</td></tr>
+            <tr><td style="padding: 0 20px 16px; font-size: 14px; color: #64748B;">Password</td>
+                <td style="padding: 0 20px 16px; font-size: 15px; color: #0F172A; font-weight: 600; font-family: monospace;">${escape(password)}</td></tr>
+          </table>
+          <a href="${frontendUrl}/login" style="display: inline-block; margin-top: 24px; padding: 12px 24px; background: #F97316; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            Sign in
+          </a>
+        </td>
+      </tr>`;
+
+    await this.transporter.sendMail({
+      from: `"${this.fromName}" <${this.fromEmail}>`,
+      to: email,
+      subject: "Your student account is ready — LMS Platform",
+      html: this.wrapTemplate(content, "#F97316"),
+    });
+  }
+
+  // ===============================
   // SECURITY ALERT EMAIL
   // ===============================
 

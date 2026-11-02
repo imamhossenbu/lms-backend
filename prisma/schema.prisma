@@ -30,6 +30,16 @@ model User {
   address       String?
   certificates  Certificate[]
   attendances   Attendance[]
+
+  enrollments      Enrollment[]
+  quizAttempts     QuizAttempt[]
+  submissions      AssignmentSubmission[]
+  lessonProgress   LessonProgress[]
+  coursesTeaching  Course[]        @relation("CourseInstructor")
+  notesAbout       StudentNote[]   @relation("NoteStudent")
+  notesAuthored    StudentNote[]   @relation("NoteAuthor")
+  /// Soft delete — hidden from lists and blocked from login.
+  deletedAt        DateTime?
   emailVerified Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -62,6 +72,7 @@ model Course {
   categoryId       String
   category         Category @relation(fields: [categoryId], references: [id])
   instructorId     String
+  instructor       User     @relation("CourseInstructor", fields: [instructorId], references: [id])
   level            String
   language         String
   price            Decimal
@@ -78,6 +89,12 @@ model Course {
   reviews      CourseReview[]
   orders       Order[]
   modules      CourseModule[]
+  enrollments    Enrollment[]
+  quizzes        Quiz[]
+  assignments    Assignment[]
+  lessonProgress LessonProgress[]
+
+  @@index([instructorId])
 }
 
 model CourseModule {
@@ -110,6 +127,7 @@ model Lesson {
   resources       String?
   status          String
   lessonResources LessonResource[]
+  progress        LessonProgress[]
 }
 
 model LessonResource {
@@ -126,31 +144,41 @@ model LessonResource {
 model Enrollment {
   id                 String    @id @default(uuid())
   userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   courseId           String
+  course             Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   enrolledAt         DateTime  @default(now())
   status             String
   progressPercentage Int       @default(0)
   completedAt        DateTime?
   lastAccessedAt     DateTime?
+
+  @@unique([userId, courseId])
+  @@index([courseId])
 }
 
 // --- Assessments ---
 model LessonProgress {
   id             String    @id @default(uuid())
   userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   courseId       String
+  course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId       String
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   isCompleted    Boolean   @default(false)
   watchedSeconds Int       @default(0)
   lastPosition   Int       @default(0)
   completedAt    DateTime?
 
   @@unique([userId, lessonId])
+  @@index([userId, courseId])
 }
 
 model Quiz {
   id               String  @id @default(uuid())
   courseId         String
+  course           Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId         String
   title            String
   description      String?
@@ -158,6 +186,10 @@ model Quiz {
   passingScore     Int
   totalMarks       Int
   status           String
+
+  attempts QuizAttempt[]
+
+  @@index([courseId])
 }
 
 model QuizQuestion {
@@ -175,18 +207,24 @@ model QuizQuestion {
 model QuizAttempt {
   id          String   @id @default(uuid())
   quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   answers     String // JSON string
   score       Int
   percentage  Decimal
   parsed      Boolean
   startedAt   DateTime @default(now())
   submittedAt DateTime
+
+  @@index([userId])
+  @@index([quizId])
 }
 
 model Assignment {
   id               String   @id @default(uuid())
   courseId         String
+  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId         String
   title            String
   description      String?
@@ -194,19 +232,28 @@ model Assignment {
   marks            Int
   allowedFileTypes String
   status           String
+
+  submissions AssignmentSubmission[]
+
+  @@index([courseId])
 }
 
 model AssignmentSubmission {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   assignmentId  String
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   fileUrl       String?
   textAnswer    String?
-  submittedAt   DateTime @default(now())
+  submittedAt   DateTime   @default(now())
   marksObtained Int?
   feedback      String?
   aiFeedback    String?
   status        String
+
+  @@index([userId])
+  @@index([assignmentId])
 }
 
 // --- Community ---
@@ -750,4 +797,30 @@ model SaasCounter {
   value Int    @default(0)
 
   @@map("saas_counters")
+}
+
+
+// --- Student notes (admin panel › Student details › Notes) ---
+enum StudentNoteCategory {
+  GOOD_PROGRESS
+  NEEDS_IMPROVEMENT
+  STUDENT_SUPPORT
+  COUNSELING_CALL
+  PAYMENT_ISSUE
+  GENERAL
+}
+
+model StudentNote {
+  id        String              @id @default(uuid())
+  studentId String
+  student   User                @relation("NoteStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User                @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  category  StudentNoteCategory @default(GENERAL)
+  content   String
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([studentId, createdAt])
+  @@map("student_notes")
 }

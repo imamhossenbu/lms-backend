@@ -205,6 +205,10 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    if (user.deletedAt) {
+      throw new UnauthorizedException("This account has been deleted");
+    }
+
     if (!user.emailVerified) {
       throw new UnauthorizedException("Please verify your email first");
     }
@@ -217,6 +221,10 @@ export class AuthService {
 
     if (user.status === "BLOCKED") {
       throw new UnauthorizedException("Your account has been blocked");
+    }
+
+    if (user.status === "INACTIVE") {
+      throw new UnauthorizedException("Your account is inactive — contact your administrator");
     }
 
     await this.prisma.user.update({
