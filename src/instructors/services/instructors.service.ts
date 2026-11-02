@@ -142,7 +142,13 @@ export class InstructorsService {
   async update(actor: AuthUser, id: string, dto: UpdateInstructorDto): Promise<InstructorDetails> {
     const current = await this.mustFind(actor, id);
     if (dto.email) await assertEmailFree(this.prisma, dto.email, id);
-    const socials = dto.socials ? { ...parseSocials(current.socialLinks), ...dto.socials } : undefined;
+    // Merge only the known keys (validated by IsSocialLinks), trimming each value.
+    const socials = dto.socials
+      ? {
+          ...parseSocials(current.socialLinks),
+          ...Object.fromEntries(Object.entries(dto.socials).map(([k, v]) => [k, (v ?? "").trim()])),
+        }
+      : undefined;
     await this.prisma.user.update({
       where: { id },
       data: {

@@ -93,7 +93,8 @@ describe("instructor DTOs", () => {
 
   it("validates social links", () => {
     expect(messages(UpdateInstructorDto, { socials: { linkedin: "https://linkedin.com/in/a", website: "" } })).toHaveLength(0);
-    expect(messages(UpdateInstructorDto, { socials: { twitter: "not a url" } })).toContain("twitter must be a full http(s) URL");
+    expect(messages(UpdateInstructorDto, { socials: { twitter: "not a url" } })).toContain("Twitter / X link must be a full URL starting with http:// or https://");
+    expect(messages(UpdateInstructorDto, { socials: { facebook: "https://fb.com/a" } })).toContain('Unknown social link "facebook"');
   });
 
   it("requires a reminder date only when the reminder is on", () => {

@@ -4,6 +4,7 @@ import { ListEventsQueryDto, ListInvoicesQueryDto } from "../dto/subscription.dt
 import { PLATFORM_OWNER_ROLE } from "../saas.constants";
 import { SaasInstitutionsService } from "../services/saas-institutions.service";
 import { SaasInvoicesService } from "../services/saas-invoices.service";
+import { SaasLifecycleService } from "../services/saas-lifecycle.service";
 import { RequireRoles, SaasValidation } from "./saas-controller.utils";
 
 const Id = () => Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
@@ -17,12 +18,20 @@ export class OwnerBillingController {
   constructor(
     private readonly institutions: SaasInstitutionsService,
     private readonly invoices: SaasInvoicesService,
+    private readonly lifecycle: SaasLifecycleService,
   ) {}
 
   @Get("snapshot")
   @ApiOperation({ summary: "Whole SaaS state ({ plans, institutions, invoices, events }) — same shape as the frontend SaasStore" })
   snapshot() {
     return this.institutions.snapshot();
+  }
+
+  @Post("lifecycle/run")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Run the hourly lifecycle job now (trial expiry, renewals, scheduled cancellations)" })
+  runLifecycle() {
+    return this.lifecycle.run();
   }
 
   @Get("events")

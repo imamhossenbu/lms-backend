@@ -1,4 +1,4 @@
-import { Transform, Type } from "class-transformer";
+import { Transform } from "class-transformer";
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -10,15 +10,14 @@ import {
   IsIn,
   IsOptional,
   IsString,
-  IsUrl,
   IsUUID,
   Matches,
   MaxLength,
   MinLength,
   ValidateIf,
-  ValidateNested,
 } from "class-validator";
 import { PaginationQueryDto } from "../../common/pagination";
+import { IsSocialLinks, type SocialLinks } from "./social-links.validator";
 import { INSTRUCTOR_STATUS_LABELS, NOTE_PRIORITIES, NOTE_TYPES } from "../instructors.constants";
 import type { InstructorNoteType, InstructorStatusLabel, NotePriority } from "../instructors.types";
 
@@ -26,12 +25,6 @@ const trim = () => Transform(({ value }) => (typeof value === "string" ? value.t
 const trimLower = () => Transform(({ value }) => (typeof value === "string" ? value.trim().toLowerCase() : value));
 /** Same rule as the panel: optional, 8–20 digits / spaces / dashes, optional leading +. */
 const PHONE_RE = /^$|^\+?[\d\s-]{8,20}$/;
-const optionalUrl = () => (target: object, key: string) => {
-  IsOptional()(target, key);
-  trim()(target, key);
-  ValidateIf((_, v) => v !== "")(target, key);
-  IsUrl({ require_protocol: true, protocols: ["http", "https"] }, { message: `${key} must be a full http(s) URL` })(target, key);
-};
 
 // ---------------------------------------------------------------- list
 
@@ -96,11 +89,6 @@ export class CreateInstructorDto {
   @IsOptional() @ASSIGN_COURSES() courseIds: string[] = [];
 }
 
-class SocialsDto {
-  @optionalUrl() linkedin?: string;
-  @optionalUrl() twitter?: string;
-  @optionalUrl() website?: string;
-}
 
 export class UpdateInstructorDto {
   @IsOptional() @NAME() name?: string;
@@ -133,7 +121,8 @@ export class UpdateInstructorDto {
   @MaxLength(40, { each: true, message: "Each skill must be 40 characters or less" })
   skills?: string[];
 
-  @IsOptional() @ValidateNested() @Type(() => SocialsDto) socials?: SocialsDto;
+  /** { linkedin?, twitter?, website? } — each "" (clear) or a full http(s) URL. */
+  @IsOptional() @IsSocialLinks() socials?: SocialLinks;
 }
 
 export class UpdateInstructorStatusDto {

@@ -11,6 +11,7 @@ import { SaasCoreService } from "./services/saas-core.service";
 import { SaasDomainsService } from "./services/saas-domains.service";
 import { SaasInstitutionsService } from "./services/saas-institutions.service";
 import { SaasInvoicesService } from "./services/saas-invoices.service";
+import { SaasLifecycleService } from "./services/saas-lifecycle.service";
 import { SaasPaymentGateway } from "./services/saas-payment.gateway";
 import { SaasPlansService } from "./services/saas-plans.service";
 import { SaasSubscriptionService } from "./services/saas-subscription.service";
@@ -20,6 +21,7 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
  *   /saas/public/*  pricing + self-signup (no auth)
  *   /saas/owner/*   Owner Console (role SUPER_ADMIN)
  *   /saas/me/*      institution admin billing (role ADMIN, scoped to the caller's institution)
+ * SaasLifecycleService runs hourly: trial expiry, renewals and scheduled cancellations.
  */
 @Module({
   imports: [
@@ -35,6 +37,7 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     SaasSubscriptionService,
     SaasInvoicesService,
     SaasDomainsService,
+    SaasLifecycleService,
     MailService,
   ],
   exports: [SaasCoreService, SaasPlansService, SaasInstitutionsService],

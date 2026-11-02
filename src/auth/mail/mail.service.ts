@@ -9,24 +9,19 @@ export class MailService {
   private fromEmail: string;
 
   constructor(private configService: ConfigService) {
-    this.fromEmail =
-      this.configService.get<string>("MAIL_FROM") ?? "imam.adsfixter@gmail.com";
+    // Credentials come from the environment only — never commit secrets as fallbacks.
+    const user = this.configService.get<string>("MAIL_USER") ?? "";
+    const pass = (this.configService.get<string>("MAIL_PASS") ?? "").replace(/\s+/g, "");
+    this.fromEmail = this.configService.get<string>("MAIL_FROM") || user;
 
-    const user =
-      this.configService.get<string>("MAIL_USER") || "imam.adsfixter@gmail.com";
-    const pass = (
-      this.configService.get<string>("MAIL_PASS") || "fjrvqrnhdicsckui"
-    ).replace(/\s+/g, "");
+    if (!user || !pass) {
+      console.warn("MAIL SERVICE: MAIL_USER / MAIL_PASS are not set — emails will fail to send.");
+    }
 
     this.transporter = nodemailer.createTransport({
       service: "gmail",
-      auth: {
-        user,
-        pass,
-      },
+      auth: { user, pass },
     });
-
-    console.log("MAIL SERVICE READY (Nodemailer Gmail SMTP)");
   }
 
   // ===============================

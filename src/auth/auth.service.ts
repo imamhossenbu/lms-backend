@@ -227,6 +227,21 @@ export class AuthService {
       throw new UnauthorizedException("Your account is inactive — contact your administrator");
     }
 
+    // Tenant gate: when an institution is suspended or closed, only its admins may sign in
+    // (to see the billing state and reactivate). Students and instructors are blocked.
+    if (user.institutionId && user.role !== "ADMIN") {
+      const institution = await this.prisma.institution.findUnique({
+        where: { id: user.institutionId },
+        select: { status: true },
+      });
+      if (institution?.status === "SUSPENDED") {
+        throw new UnauthorizedException("Your institution's workspace is temporarily suspended — contact your administrator");
+      }
+      if (institution?.status === "CANCELLED") {
+        throw new UnauthorizedException("Your institution's workspace has been closed — contact your administrator");
+      }
+    }
+
     await this.prisma.user.update({
       where: {
         id: user.id,
