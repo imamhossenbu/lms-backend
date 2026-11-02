@@ -335,6 +335,33 @@ export class MailService {
   }
 
   // ===============================
+  // ORDER RECEIPT
+  // ===============================
+
+  async sendOrderReceiptEmail(email: string, name: string, orderNumber: string, courseTitle: string, amount: number, currency: string, invoiceUrl: string) {
+    const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    const total = `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 24px 36px;">
+          <h1 style="margin: 0 0 12px; font-size: 20px; color: #0F172A;">Thanks for your purchase, ${escape(name)}!</h1>
+          <table cellpadding="0" cellspacing="0" style="width: 100%; margin: 8px 0 20px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;">
+            <tr><td style="padding: 12px 20px; font-size: 14px; color: #64748B;">Order</td><td style="padding: 12px 20px; font-size: 14px; color: #0F172A; font-weight: 600;">${escape(orderNumber)}</td></tr>
+            <tr><td style="padding: 0 20px 12px; font-size: 14px; color: #64748B;">Course</td><td style="padding: 0 20px 12px; font-size: 14px; color: #0F172A;">${escape(courseTitle)}</td></tr>
+            <tr><td style="padding: 0 20px 12px; font-size: 14px; color: #64748B;">Total paid</td><td style="padding: 0 20px 12px; font-size: 14px; color: #0F172A; font-weight: 600;">${escape(total)}</td></tr>
+          </table>
+          <a href="${invoiceUrl}" style="display: inline-block; padding: 12px 24px; background: #F97316; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Download invoice (PDF)</a>
+        </td>
+      </tr>`;
+    await this.transporter.sendMail({
+      from: `"${this.fromName}" <${this.fromEmail}>`,
+      to: email,
+      subject: `Your receipt for ${orderNumber}`,
+      html: this.wrapTemplate(content, "#F97316"),
+    });
+  }
+
+  // ===============================
   // SECURITY ALERT EMAIL
   // ===============================
 

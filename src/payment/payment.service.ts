@@ -1,16 +1,21 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import axios from "axios";
 import * as qs from "qs";
-import { EnrollmentService } from "../enrollment/enrollment.service";
+import { OrderLifecycleService } from "../commerce/order-lifecycle.service";
+import { round2, statusLabel } from "../commerce/order-status";
+import { SslCommerzService } from "../commerce/sslcommerz.service";
 import { InvoiceService } from "../invoice/invoice.service";
 
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(
     private prisma: PrismaService,
-    private enrollmentService: EnrollmentService,
     private invoiceService: InvoiceService,
+    private lifecycle: OrderLifecycleService,
+    private sslcommerz: SslCommerzService,
   ) {}
 
 
@@ -57,7 +62,7 @@ export class PaymentService {
 
     try {
       const response = await axios.post(
-        "https://sandbox.sslcommerz.com/gwprocess/v4/api.php",
+        `${process.env.SSL_IS_LIVE === "true" ? "https://securepay.sslcommerz.com" : "https://sandbox.sslcommerz.com"}/gwprocess/v4/api.php`,
         qs.stringify(payload),
         {
           headers: {
@@ -66,124 +71,68 @@ export class PaymentService {
         },
       );
 
-      console.log(response);
-
-      console.log("SSL RESPONSE:", response.data);
-
       return {
         gatewayUrl: response.data.GatewayPageURL,
         data: response.data,
       };
     } catch (error: any) {
-      console.log("SSL ERROR:", error.response?.data || error.message);
+      this.logger.error(`SSLCommerz session failed for order ${order.orderNumber}: ${error.response?.data?.failedreason ?? error.message}`);
 
       throw error;
     }
   }
 
 
-  // Record payment details and enroll the user in the course
-  async recordPayment(
-    orderId: string,
-    transactionId: string,
-    gatewayData: any,
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
+  /**
+   * SSLCommerz success redirect. The browser-posted body is NOT trusted: the val_id is validated with
+   * SSLCommerz's server API and must match this order's reference, amount and currency before the
+   * order is marked paid (which also enrolls the student). Idempotent for repeated callbacks.
+   */
+  async recordPayment(orderId: string, valId: string, _gatewayData: unknown) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException("Order not found");
+    if (statusLabel(order.status) === "Paid") return { status: "PAID", message: "Payment already completed", orderId };
 
-    if (!order) {
-      throw new NotFoundException("Order not found");
+    const tx = await this.sslcommerz.validate(valId);
+    const expected = round2(Number(order.totalAmount));
+    if (!tx || tx.tranId !== order.orderNumber || Math.abs(tx.amount - expected) > 0.01 || (tx.currency && tx.currency !== order.currency)) {
+      this.logger.warn(`Rejected unverifiable payment for order ${order.orderNumber} (val_id ${valId || "missing"})`);
+      throw new BadRequestException("We couldn't verify this payment with the gateway. If you were charged, contact support with your order number.");
     }
 
-    if (order.status === "PAID") {
-      return {
-        message: "Payment already completed",
-      };
-    }
-
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId,
-        userId: order.userId,
-        courseId: order.courseId,
-
-        provider: "SSLCOMMERZ",
-        providerTransactionId: transactionId,
-
-        amount: order.totalAmount,
-        currency: order.currency,
-
-        status: "SUCCESS",
-
-        gatewayResponse: JSON.stringify(gatewayData),
-
+    await this.prisma.$transaction((t) =>
+      this.lifecycle.markPaid(t, order, {
+        kind: "GATEWAY",
+        method: "SSLCommerz",
+        account: SslCommerzService.maskedAccount(tx),
+        transactionId: tx.bankTranId || tx.valId,
         paidAt: new Date(),
-      },
-    });
-
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: "PAID",
-      },
-    });
-
-    await this.enrollmentService.enrollUser(order.userId, order.courseId);
+        actorName: "System",
+        gatewayResponse: tx.raw,
+      }),
+    );
 
     try {
       await this.invoiceService.generateInvoice(orderId);
-      console.log("Invoice generated successfully for order:", orderId);
-    } catch (error) {
-      console.error("Failed to generate invoice:", error);
+    } catch (error: any) {
+      this.logger.error(`Invoice generation failed for order ${order.orderNumber}: ${error?.message ?? error}`);
     }
-    return payment;
+    return { status: "PAID", message: "Payment completed", orderId };
   }
 
-  // Handle failed payment callback
-  async handleFailedPayment(orderId: string, gatewayData: any) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new NotFoundException("Order not found");
-    }
-
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "FAILED" },
-    });
-
-    return {
-      status: "FAILED",
-      message: "Payment failed or was declined.",
-      orderId,
-      gatewayData,
-    };
+  /** SSLCommerz fail redirect — only a still-pending order is marked failed. */
+  async handleFailedPayment(orderId: string, _gatewayData: unknown) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+    if (!order) throw new NotFoundException("Order not found");
+    await this.lifecycle.gatewayClosed(orderId, "FAILED", "Declined at the payment gateway");
+    return { status: "FAILED", message: "Payment failed or was declined.", orderId };
   }
 
-  // Handle cancelled payment callback
-  async handleCancelledPayment(orderId: string, gatewayData: any) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new NotFoundException("Order not found");
-    }
-
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "CANCELLED" },
-    });
-
-    return {
-      status: "CANCELLED",
-      message: "Payment was cancelled by user.",
-      orderId,
-      gatewayData,
-    };
+  /** SSLCommerz cancel redirect — only a still-pending order is cancelled. */
+  async handleCancelledPayment(orderId: string, _gatewayData: unknown) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
+    if (!order) throw new NotFoundException("Order not found");
+    await this.lifecycle.gatewayClosed(orderId, "CANCELLED", "Cancelled by the student at the payment gateway");
+    return { status: "CANCELLED", message: "Payment was cancelled by user.", orderId };
   }
 }
-

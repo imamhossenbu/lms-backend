@@ -71,13 +71,8 @@ export class OrderService {
         });
       }
 
+      await tx.orderEvent.create({ data: { orderId: order.id, type: "ORDER_PLACED", actorName: "Student" } });
       return order;
-    });
-  }
-
-  async findAll() {
-    return await this.prisma.order.findMany({
-      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -97,12 +92,5 @@ export class OrderService {
     }
 
     return order;
-  }
-
-  async updateStatus(id: string, status: string) {
-    return await this.prisma.order.update({
-      where: { id },
-      data: { status },
-    });
   }
 }

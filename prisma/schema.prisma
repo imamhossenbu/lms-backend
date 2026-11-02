@@ -47,6 +47,7 @@ model User {
   reviews          CourseReview[]
   orders           Order[]
   liveClassesTaught LiveClass[]    @relation("LiveClassInstructor")
+  orderNotes       OrderNote[]     @relation("OrderNoteAuthor")
   /// Soft delete — hidden from lists and blocked from login.
   deletedAt        DateTime?
   lastLoginIp      String?
@@ -458,6 +459,8 @@ model Coupon {
   endDate           DateTime
   status            String
   createdAt         DateTime @default(now())
+
+  orders Order[]
 }
 
 model CouponUsage {
@@ -485,16 +488,41 @@ model Order {
   currency       String
   status         String
   couponId       String?
+  coupon         Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  // payment details (admin panel › Orders / Payments)
+  /// "SSLCommerz" | "bKash" | "Nagad" | "Stripe" | "PayPal"
+  paymentMethod  String?
+  /// Masked account, e.g. "Visa **** 4242".
+  paymentAccount String?
+  /// Gateway transaction / manual reference.
+  transactionId  String?
+  paidAt         DateTime?
+  manuallyPaid   Boolean   @default(false)
+  cancelReason   String?
+  refundReason   String?
+  refundedAt     DateTime?
+  receiptSentAt  DateTime?
+  ipAddress      String?
+  device         String?
+  referralSource String    @default("Direct")
+  notes          String?
+
+  events     OrderEvent[]
+  orderNotes OrderNote[]
+  payments   Payment[]
+
   @@index([courseId, status])
   @@index([userId])
+  @@index([status, createdAt])
 }
 
 model Payment {
   id                    String    @id @default(uuid())
   orderId               String
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   userId                String
   courseId              String
   provider              String
@@ -505,6 +533,8 @@ model Payment {
   gatewayResponse       String
   paidAt                DateTime?
   createdAt             DateTime  @default(now())
+
+  @@index([orderId])
 }
 
 model Invoice {
@@ -997,4 +1027,54 @@ model TeamEvent {
 
   @@index([institutionId, at])
   @@map("team_events")
+}
+
+
+// --- Order timeline + internal notes (admin panel › Orders / Payments) ---
+enum OrderEventType {
+  ORDER_PLACED
+  PAYMENT_COMPLETED
+  PAYMENT_VERIFIED
+  MARKED_AS_PAID
+  ENROLLMENT_CREATED
+  COURSE_ACCESS_GRANTED
+  PAYMENT_FAILED
+  ORDER_CANCELLED
+  ORDER_REOPENED
+  REFUND_ISSUED
+  COURSE_ACCESS_REVOKED
+}
+
+model OrderEvent {
+  id        String         @id @default(uuid())
+  orderId   String
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      OrderEventType
+  at        DateTime       @default(now())
+  /// Who did it ("System" for gateway callbacks).
+  actorName String?
+  note      String?
+
+  @@index([orderId, at])
+  @@map("order_events")
+}
+
+enum OrderNoteScope {
+  ORDER
+  PAYMENT
+}
+
+model OrderNote {
+  id        String         @id @default(uuid())
+  orderId   String
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  scope     OrderNoteScope
+  authorId  String
+  author    User           @relation("OrderNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([orderId, scope, createdAt])
+  @@map("order_notes")
 }

@@ -6,7 +6,6 @@ import {
   UseGuards,
   Get,
   Param,
-  Patch,
 } from "@nestjs/common";
 import { Request } from "express";
 import { OrderService } from "./order.service";
@@ -15,6 +14,9 @@ import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 
+/**
+ * Student checkout API. Admin order management lives in /admin/orders and /admin/payments (src/orders).
+ */
 @Controller("orders")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
 export class OrderController {
@@ -32,12 +34,6 @@ export class OrderController {
     return await this.orderService.create(user.userId, dto);
   }
 
-  @Get("all")
-  @Roles("ADMIN")
-  async findAll() {
-    return await this.orderService.findAll();
-  }
-
   @Get("my-orders")
   @Roles("STUDENT", "ADMIN")
   async findMyOrders(@Req() req: Request) {
@@ -50,11 +46,5 @@ export class OrderController {
   async getOrder(@Req() req: Request, @Param("id") id: string) {
     const user = req.user as any;
     return await this.orderService.findOne(id, user.userId, user.role);
-  }
-
-  @Patch(":id/status")
-  @Roles("ADMIN")
-  async updateStatus(@Param("id") id: string, @Body("status") status: string) {
-    return await this.orderService.updateStatus(id, status);
   }
 }

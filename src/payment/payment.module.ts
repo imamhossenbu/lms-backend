@@ -3,11 +3,11 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { HttpModule } from "@nestjs/axios";
 import { PaymentController } from "./payment.controller";
 import { PaymentService } from "./payment.service";
-import { EnrollmentModule } from "../enrollment/enrollment.module";
+import { CommerceModule } from "../commerce/commerce.module";
 import { InvoiceModule } from "../invoice/invoice.module";
 
 @Module({
-  imports: [PrismaModule, HttpModule, EnrollmentModule, InvoiceModule],
+  imports: [PrismaModule, HttpModule, InvoiceModule, CommerceModule],
   controllers: [PaymentController],
   providers: [PaymentService],
 })

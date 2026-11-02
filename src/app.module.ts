@@ -38,6 +38,7 @@ import { SaasModule } from "./saas/saas.module";
 import { StudentsModule } from "./students/students.module";
 import { InstructorsModule } from "./instructors/instructors.module";
 import { TeamModule } from "./team/team.module";
+import { OrdersModule } from "./orders/orders.module";
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { TeamModule } from "./team/team.module";
     StudentsModule,
     InstructorsModule,
     TeamModule,
+    OrdersModule,
   ],
   providers: [
     {
