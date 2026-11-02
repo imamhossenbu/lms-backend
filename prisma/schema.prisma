@@ -49,6 +49,15 @@ model User {
   liveClassesTaught LiveClass[]    @relation("LiveClassInstructor")
   /// Soft delete — hidden from lists and blocked from login.
   deletedAt        DateTime?
+  lastLoginIp      String?
+
+  // Two-factor authentication (TOTP). The secret is AES-256-GCM encrypted (common/crypto.ts).
+  twoFactorEnabled   Boolean   @default(false)
+  twoFactorSecret    String?
+  twoFactorEnabledAt DateTime?
+
+  teamMembership   TeamMember?     @relation("TeamMemberUser")
+  teamInvitesSent  TeamMember[]    @relation("TeamMemberInviter")
   emailVerified Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -885,4 +894,107 @@ model InstructorNote {
 
   @@index([instructorId, createdAt])
   @@map("instructor_notes")
+}
+
+
+// =====================================================================
+// --- Team & Roles (admin-panel staff RBAC) ---
+// Mirrors lms-admin-panel src/types/team.ts. Permissions are JSON maps
+// { [module]: action[] } validated by src/team/team-permissions.ts.
+// =====================================================================
+
+enum TeamMemberStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum TeamEventType {
+  INVITED
+  INVITE_RESENT
+  INVITE_REVOKED
+  JOINED
+  ROLE_CHANGED
+  SUSPENDED
+  REACTIVATED
+  REMOVED
+  TWO_FA_ENABLED
+  TWO_FA_RESET
+  ROLE_CREATED
+  ROLE_UPDATED
+  ROLE_RESET
+  ROLE_DELETED
+  EXTRA_PERMISSIONS_GRANTED
+  EXTRA_PERMISSIONS_REMOVED
+}
+
+model TeamRole {
+  id                 String   @id @default(uuid())
+  /// Tenant (null = legacy single-tenant workspace).
+  institutionId      String?
+  /// Built-in role key ("super-admin", "admin", "content", "support", "finance"); null for custom roles.
+  systemKey          String?
+  name               String
+  description        String   @default("")
+  tone               String   @default("gray")
+  isSystem           Boolean  @default(false)
+  isLocked           Boolean  @default(false)
+  permissions        Json
+  /// System roles: shipped preset for "Reset to default". null for custom roles.
+  defaultPermissions Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members TeamMember[]
+
+  @@index([institutionId])
+  @@map("team_roles")
+}
+
+model TeamMember {
+  id                String           @id @default(uuid())
+  institutionId     String?
+  /// Set once the invitation is accepted (or for the workspace owner).
+  userId            String?          @unique
+  user              User?            @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  email             String
+  roleId            String
+  role              TeamRole         @relation(fields: [roleId], references: [id])
+  /// Additive grants on top of the role (never repeats a role permission).
+  extraPermissions  Json
+  status            TeamMemberStatus
+  isOwner           Boolean          @default(false)
+  joinedAt          DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  // invitation (while status = INVITED)
+  /// SHA-256 of the invitation token — the raw token is only ever in the email link.
+  inviteTokenHash   String?          @unique
+  inviteSentAt      DateTime?
+  inviteExpiresAt   DateTime?
+  inviteMessage     String?
+  invitedById       String?
+  invitedBy         User?            @relation("TeamMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  inviteResentCount Int              @default(0)
+
+  @@index([institutionId, status])
+  @@index([institutionId, email])
+  @@map("team_members")
+}
+
+model TeamEvent {
+  id            String        @id @default(uuid())
+  institutionId String?
+  type          TeamEventType
+  actorId       String?
+  actorName     String
+  /// Member or role the event is about (null once it was deleted).
+  targetId      String?
+  targetName    String
+  detail        String        @default("")
+  at            DateTime      @default(now())
+
+  @@index([institutionId, at])
+  @@map("team_events")
 }

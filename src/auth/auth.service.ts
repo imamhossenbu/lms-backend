@@ -19,6 +19,10 @@ import {
 } from "./dto/auth.dto";
 
 import { MailService } from "./mail/mail.service";
+import { TwoFactorService } from "./two-factor.service";
+
+/** Purpose claim of the short-lived token between the password step and the 2FA code step. */
+const TWO_FACTOR_CHALLENGE = "2fa-login";
 
 @Injectable()
 export class AuthService {
@@ -26,6 +30,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private mailService: MailService,
+    private twoFactor: TwoFactorService,
   ) {}
 
   // REGISTER
@@ -194,7 +199,11 @@ export class AuthService {
   }
 
   // LOGIN
-  async login(dto: LoginDto) {
+  /**
+   * Password step. Accounts with 2FA get `{ twoFactorRequired, challengeToken }` (valid 5 minutes) and finish
+   * with POST /auth/2fa/login; everyone else gets `{ token }` straight away.
+   */
+  async login(dto: LoginDto, ip?: string) {
     const user = await this.prisma.user.findUnique({
       where: {
         email: dto.email,
@@ -242,15 +251,43 @@ export class AuthService {
       }
     }
 
-    await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        lastLoginAt: new Date(),
-      },
-    });
+    // Admin-panel staff whose team access was suspended can't sign in.
+    const membership = await this.prisma.teamMember.findUnique({ where: { userId: user.id }, select: { status: true } });
+    if (membership?.status === "SUSPENDED") {
+      throw new UnauthorizedException("Your team access has been suspended — contact the workspace owner");
+    }
 
+    if (user.twoFactorEnabled) {
+      return {
+        twoFactorRequired: true,
+        challengeToken: this.jwt.sign({ sub: user.id, purpose: TWO_FACTOR_CHALLENGE }, { expiresIn: "5m" }),
+      };
+    }
+    return this.issueSession(user, ip);
+  }
+
+  /** Second login step for 2FA accounts: challenge token from `login` + a 6-digit authenticator code. */
+  async completeTwoFactorLogin(challengeToken: string, code: string, ip?: string) {
+    let payload: { sub?: string; purpose?: string };
+    try {
+      payload = this.jwt.verify(challengeToken);
+    } catch {
+      throw new UnauthorizedException("Your sign-in session expired. Enter your email and password again.");
+    }
+    if (payload.purpose !== TWO_FACTOR_CHALLENGE || !payload.sub) throw new UnauthorizedException("Invalid sign-in session.");
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.deletedAt || !user.twoFactorEnabled) throw new UnauthorizedException("Invalid sign-in session.");
+    if (!this.twoFactor.verify(user.twoFactorSecret, code)) throw new UnauthorizedException("That code didn't match. Check your authenticator app and try again.");
+    return this.issueSession(user, ip);
+  }
+
+  /** Records the sign-in and returns the access token. */
+  private async issueSession(user: { id: string; email: string; role: string; institutionId: string | null }, ip?: string) {
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), ...(ip ? { lastLoginIp: ip } : {}) },
+    });
     return {
       token: this.jwt.sign({
         sub: user.id,

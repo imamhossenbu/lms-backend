@@ -18,12 +18,20 @@ import {
   ResetPasswordDto,
   VerifyEmailDto,
   ResendVerificationDto,
+  TwoFactorCodeDto,
+  TwoFactorLoginDto,
 } from "./dto/auth.dto";
+import { Throttle } from "@nestjs/throttler";
+import { TwoFactorService } from "./two-factor.service";
+import { CurrentUser, type AuthUser } from "../common/auth-user";
 import { AuthGuard } from "@nestjs/passport";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly twoFactor: TwoFactorService,
+  ) {}
 
   @Post("register")
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -33,8 +41,47 @@ export class AuthController {
 
   @Post("login")
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  async login(@Body() loginDto: LoginDto) {
-    return await this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Req() req: any) {
+    return await this.authService.login(loginDto, req.ip);
+  }
+
+  // ---------------------------------------------------------------- two-factor (TOTP)
+
+  /** Second sign-in step for accounts with 2FA. */
+  @Post("2fa/login")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async twoFactorLogin(@Body() dto: TwoFactorLoginDto, @Req() req: any) {
+    return this.authService.completeTwoFactorLogin(dto.challengeToken, dto.code, req.ip);
+  }
+
+  @Get("2fa")
+  @UseGuards(AuthGuard("jwt"))
+  async twoFactorStatus(@CurrentUser() user: AuthUser) {
+    return this.twoFactor.status(user.userId);
+  }
+
+  /** Starts enrolment: returns the secret, otpauth URL and a QR code to scan. */
+  @Post("2fa/setup")
+  @UseGuards(AuthGuard("jwt"))
+  async twoFactorSetup(@CurrentUser() user: AuthUser) {
+    return this.twoFactor.setup(user.userId);
+  }
+
+  @Post("2fa/enable")
+  @UseGuards(AuthGuard("jwt"))
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async twoFactorEnable(@CurrentUser() user: AuthUser, @Body() dto: TwoFactorCodeDto) {
+    return this.twoFactor.enable(user.userId, dto.code);
+  }
+
+  @Post("2fa/disable")
+  @UseGuards(AuthGuard("jwt"))
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async twoFactorDisable(@CurrentUser() user: AuthUser, @Body() dto: TwoFactorCodeDto) {
+    return this.twoFactor.disable(user.userId, dto.code);
   }
 
   // GET verify (Link click from email)

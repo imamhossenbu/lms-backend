@@ -284,6 +284,57 @@ export class MailService {
   }
 
   // ===============================
+  // TEAM INVITATION
+  // ===============================
+
+  async sendTeamInviteEmail(email: string, inviterName: string, workspaceName: string, roleName: string, message: string, link: string, expiresAt: Date) {
+    const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    const expires = expiresAt.toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" });
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 24px 36px;">
+          <h1 style="margin: 0 0 12px; font-size: 22px; color: #0F172A;">You're invited to join ${escape(workspaceName)}</h1>
+          <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #334155;">
+            ${escape(inviterName)} invited you to the admin team as <strong>${escape(roleName)}</strong>.
+          </p>
+          ${message ? `<blockquote style="margin: 0 0 16px; padding: 12px 16px; background: #F8FAFC; border-left: 3px solid #F97316; color: #334155; font-size: 14px; white-space: pre-line;">${escape(message)}</blockquote>` : ""}
+          <a href="${link}" style="display: inline-block; margin-top: 8px; padding: 12px 24px; background: #F97316; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Accept invitation</a>
+          <p style="margin: 20px 0 0; font-size: 13px; color: #64748B;">This link expires on ${expires}. If you weren't expecting it, you can ignore this email.</p>
+        </td>
+      </tr>`;
+    await this.transporter.sendMail({
+      from: `"${this.fromName}" <${this.fromEmail}>`,
+      to: email,
+      subject: `${inviterName} invited you to ${workspaceName}`,
+      html: this.wrapTemplate(content, "#F97316"),
+    });
+  }
+
+  // ===============================
+  // 2FA REMINDER
+  // ===============================
+
+  async sendTwoFactorReminderEmail(email: string, name: string, senderName: string, link: string) {
+    const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 24px 36px;">
+          <h1 style="margin: 0 0 12px; font-size: 20px; color: #0F172A;">Please turn on two-factor authentication</h1>
+          <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #334155;">
+            Hi ${escape(name)}, ${escape(senderName)} asked every admin to protect their account with an authenticator app. It takes about a minute.
+          </p>
+          <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #F97316; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Set up 2FA</a>
+        </td>
+      </tr>`;
+    await this.transporter.sendMail({
+      from: `"${this.fromName}" <${this.fromEmail}>`,
+      to: email,
+      subject: "Action needed: turn on two-factor authentication",
+      html: this.wrapTemplate(content, "#F97316"),
+    });
+  }
+
+  // ===============================
   // SECURITY ALERT EMAIL
   // ===============================
 

@@ -37,6 +37,7 @@ import { EnrollmentModule } from "./enrollment/enrollment.module";
 import { SaasModule } from "./saas/saas.module";
 import { StudentsModule } from "./students/students.module";
 import { InstructorsModule } from "./instructors/instructors.module";
+import { TeamModule } from "./team/team.module";
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { InstructorsModule } from "./instructors/instructors.module";
     SaasModule,
     StudentsModule,
     InstructorsModule,
+    TeamModule,
   ],
   providers: [
     {

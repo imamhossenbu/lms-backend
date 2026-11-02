@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from "class-validator";
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from "class-validator";
 
 export class RegisterDto {
   @IsEmail()
@@ -60,4 +60,17 @@ export class VerifyEmailDto {
 export class ResendVerificationDto {
   @IsEmail()
   email!: string;
+}
+// ---------------------------------------------------------------- two-factor
+
+export class TwoFactorCodeDto {
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "Enter the 6-digit code from your authenticator app" })
+  code!: string;
+}
+
+export class TwoFactorLoginDto extends TwoFactorCodeDto {
+  @IsString()
+  @MinLength(10, { message: "Sign-in session is missing" })
+  challengeToken!: string;
 }

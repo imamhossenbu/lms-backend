@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
+import { RequirePermission } from "../team/permissions.guard";
 import { CreateStudentDto, StudentQueryDto, UpdateStudentDto, UpdateStudentStatusDto } from "./dto/student.dto";
 import { StudentsService } from "./services/students.service";
 import { STUDENT_MANAGER_ROLES } from "./students.constants";
@@ -17,34 +18,40 @@ export class StudentsController {
 
   @Get()
   @ApiOperation({ summary: "Paginated students with search, status and course filters" })
+  @RequirePermission("students", "view")
   list(@CurrentUser() user: AuthUser, @Query() query: StudentQueryDto) {
     return this.students.list(user, query);
   }
 
   @Get(":id")
   @ApiOperation({ summary: "Student profile + learning metrics" })
+  @RequirePermission("students", "view")
   detail(@CurrentUser() user: AuthUser, @StudentId() id: string) {
     return this.students.detail(user, id);
   }
 
   @Post()
   @ApiOperation({ summary: "Create a student (auto-generated password emailed) and enroll selected courses" })
+  @RequirePermission("students", "manage")
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateStudentDto) {
     return this.students.create(user, dto);
   }
 
   @Patch(":id")
+  @RequirePermission("students", "manage")
   update(@CurrentUser() user: AuthUser, @StudentId() id: string, @Body() dto: UpdateStudentDto) {
     return this.students.update(user, id, dto);
   }
 
   @Patch(":id/status")
+  @RequirePermission("students", "manage")
   setStatus(@CurrentUser() user: AuthUser, @StudentId() id: string, @Body() dto: UpdateStudentStatusDto) {
     return this.students.setStatus(user, id, dto.status);
   }
 
   @Delete(":id")
   @ApiOperation({ summary: "Soft-delete a student (records kept, login blocked)" })
+  @RequirePermission("students", "delete")
   remove(@CurrentUser() user: AuthUser, @StudentId() id: string) {
     return this.students.remove(user, id);
   }
