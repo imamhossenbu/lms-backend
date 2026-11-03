@@ -92,6 +92,9 @@ export interface InvoiceView {
   periodStart: string;
   periodEnd: string;
   description?: string;
+  /** Coupon discount on `amount` (pre-tax); total = amount − discount + tax. */
+  discount: number;
+  couponCode: string | null;
 }
 
 export interface EventView {

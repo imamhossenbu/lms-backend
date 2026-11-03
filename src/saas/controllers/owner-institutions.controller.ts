@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApplyCouponDto } from "../coupons/dto/coupon.dto";
+import { CouponRedemptionsService } from "../coupons/services/coupon-redemptions.service";
 import { AddNoteDto, CreateInstitutionDto, SlugAvailabilityQueryDto, UpdateInstitutionDto } from "../dto/institution.dto";
 import {
   CancelSubscriptionDto,
@@ -28,6 +30,7 @@ export class OwnerInstitutionsController {
     private readonly institutions: SaasInstitutionsService,
     private readonly subscriptions: SaasSubscriptionService,
     private readonly domains: SaasDomainsService,
+    private readonly coupons: CouponRedemptionsService,
   ) {}
 
   // ---------------------------------------------------------------- institutions
@@ -82,7 +85,7 @@ export class OwnerInstitutionsController {
   @Post(":id/change-plan")
   @HttpCode(200)
   changePlan(@Id() id: string, @Body() dto: ChangePlanDto) {
-    return this.subscriptions.changePlan(id, dto.planId, dto.cycle, "Owner");
+    return this.subscriptions.changePlan(id, dto.planId, dto.cycle, "Owner", dto.couponCode);
   }
 
   @Post(":id/cancel")
@@ -118,7 +121,19 @@ export class OwnerInstitutionsController {
   @Post(":id/convert-trial")
   @HttpCode(200)
   convertTrial(@Id() id: string, @Body() dto: ConvertTrialDto) {
-    return this.subscriptions.convertTrial(id, dto.planId, dto.cycle, dto.paymentMethod, "Owner");
+    return this.subscriptions.convertTrial(id, dto.planId, dto.cycle, dto.paymentMethod, "Owner", dto.couponCode);
+  }
+
+  @Post(":id/coupon")
+  @ApiOperation({ summary: "Apply a platform coupon to the current plan / cycle (discounts the next invoices)" })
+  applyCoupon(@Id() id: string, @Body() dto: ApplyCouponDto) {
+    return this.coupons.applyToInstitution(id, dto.code);
+  }
+
+  @Delete(":id/coupon")
+  @ApiOperation({ summary: "Stop the running coupon discount (history kept)" })
+  removeCoupon(@Id() id: string) {
+    return this.coupons.removeFromInstitution(id);
   }
 
   @Patch(":id/payment-method")

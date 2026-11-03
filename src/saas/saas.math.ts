@@ -19,7 +19,8 @@ const TIER_INDEX: Record<string, number> = Object.fromEntries(TIER_PLAN_IDS.map(
 export const priceFor = (plan: Pick<PlanView, "priceMonthly" | "priceYearly">, cycle: BillingCycle) =>
   cycle === "YEARLY" ? plan.priceYearly : plan.priceMonthly;
 
-export const taxFor = (country: string, amount: number) => Math.round(amount * (SAAS_TAX_RATES[country] ?? 0) * 100) / 100;
+/** Country rate when known, otherwise `fallbackPct` (Console settings › Billing › tax rate, default 0). */
+export const taxFor = (country: string, amount: number, fallbackPct = 0) => Math.round(amount * (SAAS_TAX_RATES[country] ?? fallbackPct / 100) * 100) / 100;
 
 /** Adds calendar months in UTC, clamping the day (Jan 31 + 1 month → Feb 28/29). */
 export function addMonthsUtc(from: Date, months: number): Date {

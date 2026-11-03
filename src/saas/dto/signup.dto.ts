@@ -1,4 +1,5 @@
 import { Equals, IsIn, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsOptionalCouponCode } from "../coupons/dto/coupon.dto";
 import { SAAS_COUNTRIES } from "../saas.constants";
 import { IsCycle, IsPlanId, IsSaasEmail, IsSaasName, IsSaasSlug } from "./common";
 import { INSTITUTION_TYPES, type InstitutionTypeValue } from "./institution.dto";
@@ -21,6 +22,9 @@ export class SignupDto {
   @IsSaasSlug() slug!: string;
   @IsPlanId() planId!: string;
   @IsCycle() cycle!: "MONTHLY" | "YEARLY";
+
+  /** Optional platform coupon; discounts the first paid invoice(s) after the trial. */
+  @IsOptionalCouponCode() couponCode?: string;
 
   @Equals(true, { message: "You must accept the Terms of Service and Privacy Policy" })
   agreeTerms!: boolean;

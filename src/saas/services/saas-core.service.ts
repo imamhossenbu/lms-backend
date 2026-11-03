@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma, SaasEventType } from "../../../generated/prisma";
 import { PrismaService } from "../../prisma/prisma.service";
+import { ConsoleSettingsReader } from "../console-settings/services/console-settings-reader.service";
+import { recordDiscount } from "../coupons/coupon-billing";
+import { couponMoney } from "../coupons/coupon.rules";
+import type { AppliedDiscount } from "../coupons/coupons.types";
 import { toInstitutionView, toInvoiceView, toPlanView } from "../saas.mapper";
 import { DAY_MS, money, round2, taxFor } from "../saas.math";
 import type { BillingCycle, InstitutionView, InvoiceView, PlanView, SaasActorKind } from "../saas.types";
@@ -9,11 +13,20 @@ export type Tx = Prisma.TransactionClient;
 
 /**
  * Shared building blocks for the SaaS services: loading rows inside a transaction, appending timeline events,
- * issuing invoices (atomic yearly numbering) and settling PAST_DUE once nothing is unpaid.
+ * issuing invoices (atomic yearly numbering, console invoice prefix / fallback tax rate, coupon discounts)
+ * and settling PAST_DUE once nothing is unpaid.
  */
 @Injectable()
 export class SaasCoreService {
-  constructor(readonly prisma: PrismaService) {}
+  constructor(
+    readonly prisma: PrismaService,
+    private readonly consoleSettings: ConsoleSettingsReader,
+  ) {}
+
+  /** Console settings › Trials (signup trial-length fallback). */
+  trialSettings(tx: Tx = this.prisma) {
+    return this.consoleSettings.section("trials", tx);
+  }
 
   /** Runs `fn` in an interactive transaction (all-or-nothing mutations). */
   tx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
@@ -46,44 +59,62 @@ export class SaasCoreService {
     return tx.saasEvent.create({ data: { institutionId, type, message, actor } });
   }
 
-  /** Next "EDP-<year>-00001" number from an atomic per-year counter (safe under concurrent requests). */
-  async nextInvoiceNumber(tx: Tx, at: Date) {
+  /** Next "<prefix>-<year>-00001" number from an atomic per-year counter (safe under concurrent requests). */
+  async nextInvoiceNumber(tx: Tx, at: Date, prefix = "EDP") {
     const year = at.getUTCFullYear();
     const counter = await tx.saasCounter.upsert({
       where: { key: `invoice-${year}` },
       create: { key: `invoice-${year}`, value: 1 },
       update: { value: { increment: 1 } },
     });
-    return `EDP-${year}-${String(counter.value).padStart(5, "0")}`;
+    return `${prefix}-${year}-${String(counter.value).padStart(5, "0")}`;
   }
 
-  /** Issues an invoice (paid now, or OPEN with a 7-day due date) and logs it on the timeline. */
+  /**
+   * Issues an invoice (paid now, or OPEN with a 7-day due date) and logs it on the timeline.
+   * `amount` is the gross line; a coupon `discount` (from quoteDiscount, priced before charging) is taken off
+   * before tax and booked on its redemption. Prefix + fallback tax rate come from Console settings › Billing.
+   */
   async addInvoice(
     tx: Tx,
     inst: Pick<InstitutionView, "id" | "country">,
-    opts: { planId: string; cycle: BillingCycle; amount: number; periodStart: Date; periodEnd: Date; paid: boolean; description: string },
+    opts: {
+      planId: string;
+      cycle: BillingCycle;
+      amount: number;
+      periodStart: Date;
+      periodEnd: Date;
+      paid: boolean;
+      description: string;
+      discount?: AppliedDiscount | null;
+    },
   ): Promise<InvoiceView> {
     const issuedAt = new Date();
+    const billing = await this.consoleSettings.section("billing", tx);
     const amount = round2(opts.amount);
-    const tax = taxFor(inst.country, amount);
+    const discount = opts.discount && opts.discount.amount > 0 ? { ...opts.discount, amount: Math.min(amount, round2(opts.discount.amount)) } : null;
+    const net = round2(amount - (discount?.amount ?? 0));
+    const tax = taxFor(inst.country, net, billing.taxRate);
     const row = await tx.saasInvoice.create({
       data: {
-        number: await this.nextInvoiceNumber(tx, issuedAt),
+        number: await this.nextInvoiceNumber(tx, issuedAt, billing.invoicePrefix),
         institutionId: inst.id,
         planId: opts.planId,
         cycle: opts.cycle,
         amount,
         tax,
-        total: round2(amount + tax),
+        total: round2(net + tax),
         status: opts.paid ? "PAID" : "OPEN",
         issuedAt,
         dueAt: new Date(issuedAt.getTime() + (opts.paid ? 0 : 7 * DAY_MS)),
         paidAt: opts.paid ? issuedAt : null,
         periodStart: opts.periodStart,
         periodEnd: opts.periodEnd,
-        description: opts.description,
+        description: discount ? `${opts.description} · coupon ${discount.code} −${couponMoney(discount.amount)}` : opts.description,
+        ...(discount ? { discount: discount.amount, couponCode: discount.code, couponRedemptionId: discount.redemptionId } : {}),
       },
     });
+    if (discount) await recordDiscount(tx, discount, issuedAt);
     const invoice = toInvoiceView(row);
     if (opts.paid) await this.event(tx, inst.id, "PAYMENT_SUCCEEDED", `Payment of ${money(invoice.total)} received (${invoice.number})`, "System");
     else await this.event(tx, inst.id, "NOTE", `Invoice ${invoice.number} for ${money(invoice.total)} issued — awaiting payment`, "System");

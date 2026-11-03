@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { cycleLabel, money, periodEndFrom, priceFor, subscriptionPrice } from "../saas.math";
+import { quoteDiscount } from "../coupons/coupon-billing";
+import { cycleLabel, money, periodEndFrom, priceFor, round2, subscriptionPrice } from "../saas.math";
 import type { InstitutionView } from "../saas.types";
 import { SaasCoreService } from "./saas-core.service";
 import { SaasPaymentGateway } from "./saas-payment.gateway";
@@ -21,6 +22,7 @@ export interface LifecycleReport {
  *  - TRIALING past trialEndsAt → charged and ACTIVE when a payment method is on file, otherwise CANCELLED (TRIAL_EXPIRED)
  *  - ACTIVE with cancelAtPeriodEnd past currentPeriodEnd → CANCELLED
  *  - ACTIVE past currentPeriodEnd → next period + invoice; a declined charge leaves it PAST_DUE
+ * Charges are net of the institution's running coupon (quoteDiscount); a 100% discount needs no charge.
  * Every transition is guarded by a conditional update, so concurrent runs never double-bill.
  */
 @Injectable()
@@ -78,7 +80,9 @@ export class SaasLifecycleService {
     const s = inst.subscription;
     const plan = await this.core.mustPlan(this.core.prisma, s.planId);
     const amount = priceFor(plan, s.cycle);
-    const charge = amount > 0 && s.paymentMethod ? await this.gateway.charge(s.paymentMethod, amount) : null;
+    const discount = amount > 0 ? await quoteDiscount(this.core.prisma, inst.id, { planId: plan.id, cycle: s.cycle, amount, at: now }) : null;
+    const due = round2(amount - (discount?.amount ?? 0));
+    const charge = amount <= 0 ? null : due <= 0 ? { ok: true as const } : s.paymentMethod ? await this.gateway.charge(s.paymentMethod, due) : null;
 
     await this.core.tx(async (tx) => {
       // Guard: only act if it is still the same trial (another run may have handled it).
@@ -98,6 +102,7 @@ export class SaasLifecycleService {
           periodEnd,
           paid: true,
           description: `${plan.name} plan — ${cycleLabel(s.cycle)} subscription`,
+          discount,
         });
         report.trialsConverted++;
       } else {
@@ -139,7 +144,9 @@ export class SaasLifecycleService {
 
       const start = new Date(s.currentPeriodEnd);
       const end = periodEndFrom(start, s.cycle);
-      const charge = amount > 0 ? await this.gateway.charge(s.paymentMethod, amount) : { ok: true as const };
+      const discount = amount > 0 ? await quoteDiscount(this.core.prisma, inst.id, { planId: s.planId, cycle: s.cycle, amount, at: start }) : null;
+      const due = round2(amount - (discount?.amount ?? 0));
+      const charge = due > 0 ? await this.gateway.charge(s.paymentMethod, due) : { ok: true as const };
 
       const advanced = await this.core.tx(async (tx) => {
         const res = await tx.institution.updateMany({
@@ -156,6 +163,7 @@ export class SaasLifecycleService {
             periodEnd: end,
             paid: charge.ok,
             description: `${plan?.name ?? s.planId} plan — ${cycleLabel(s.cycle)} renewal`,
+            discount,
           });
           if (!charge.ok) {
             await tx.saasInvoice.update({ where: { id: invoice.id }, data: { status: "FAILED" } });
