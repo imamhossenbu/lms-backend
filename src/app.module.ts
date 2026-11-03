@@ -16,6 +16,7 @@ import { LessonProgressModule } from "./lesson-progress/lesson-progress.module";
 import { QuizModule } from "./quiz/quiz.module";
 import { AssignmentModule } from "./assignment/assignment.module";
 import { CouponModule } from "./coupon/coupon.module";
+import { CommunityModule } from "./community/community.module";
 import { DiscussionModule } from "./discussion/discussion.module";
 import { ReviewModule } from "./review/review.module";
 import { CertificateModule } from "./certificate/certificate.module";
@@ -72,6 +73,7 @@ import { CertificatesModule } from "./certificates/certificates.module";
     AssignmentModule,
     CouponModule,
     DiscussionModule,
+    CommunityModule,
     ReviewModule,
     CertificateModule,
     NotificationModule,

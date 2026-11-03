@@ -50,6 +50,7 @@ model User {
   liveClassesTaught       LiveClass[]            @relation("LiveClassInstructor")
   orderNotes              OrderNote[]            @relation("OrderNoteAuthor")
   notificationDeliveries  NotificationDelivery[]
+  discussionReports       DiscussionReport[]     @relation("DiscussionReporter")
   /// Soft delete — hidden from lists and blocked from login.
   deletedAt               DateTime?
   lastLoginIp             String?
@@ -462,16 +463,39 @@ model AssignmentSubmission {
 }
 
 // --- Community ---
+/// Community thread (admin panel › Community). Legacy rows: no institutionId, plain/HTML `body`, no flags.
+/// `userId` has no FK (legacy) — authors are looked up defensively.
 model Discussion {
-  id         String            @id @default(uuid())
-  courseId   String
-  userId     String
-  title      String
-  body       String
-  tags       String?
-  isResolved Boolean           @default(false)
-  createdAt  DateTime          @default(now())
-  replies    DiscussionReply[]
+  id            String             @id @default(uuid())
+  /// SaaS tenant. null = legacy single-tenant data.
+  institutionId String?
+  courseId      String
+  /// null / "" = course-wide.
+  moduleId      String?
+  userId        String
+  title         String
+  /// Sanitized rich-text HTML.
+  body          String
+  /// Comma-separated lower-case tags (each matches ^[a-z0-9-]+$, so commas never occur inside a tag).
+  tags          String?
+  /// "QUESTION" | "DISCUSSION" | "ANNOUNCEMENT" | "SHOWCASE" | "FEEDBACK".
+  category      String             @default("DISCUSSION")
+  /// Kept in sync with "has an accepted reply" for QUESTION threads.
+  isResolved    Boolean            @default(false)
+  isPinned      Boolean            @default(false)
+  /// No new replies.
+  isLocked      Boolean            @default(false)
+  /// Hidden from students (moderation).
+  isHidden      Boolean            @default(false)
+  views         Int                @default(0)
+  likes         Int                @default(0)
+  createdAt     DateTime           @default(now())
+  /// Last content edit or new reply (pin / lock / hide don't bump it), like the panel. null = never (legacy rows) → createdAt.
+  updatedAt     DateTime?
+  replies       DiscussionReply[]
+  reports       DiscussionReport[]
+
+  @@index([institutionId, courseId])
 }
 
 model DiscussionReply {
@@ -479,9 +503,47 @@ model DiscussionReply {
   discussionId  String
   discussion    Discussion @relation(fields: [discussionId], references: [id])
   userId        String
+  /// Sanitized rich-text HTML.
   body          String
+  /// One level of nesting: always a top-level reply's id (or null).
   parentReplyId String?
+  likes         Int        @default(0)
+  /// Accepted answer (QUESTION threads, at most one per thread).
+  isAccepted    Boolean    @default(false)
+  /// Soft-removed by a moderator.
+  isRemoved     Boolean    @default(false)
   createdAt     DateTime   @default(now())
+  /// Last edit; null = never edited (legacy rows) → createdAt.
+  updatedAt     DateTime?
+
+  @@index([discussionId, createdAt])
+}
+
+/// A member's report on a thread or a reply (moderation queue).
+model DiscussionReport {
+  id             String     @id @default(uuid())
+  institutionId  String?
+  threadId       String
+  thread         Discussion @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  /// "THREAD" | "REPLY".
+  targetType     String
+  /// Thread id, or the reply id when targetType = REPLY.
+  targetId       String
+  reporterId     String
+  reporter       User       @relation("DiscussionReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  /// "SPAM" | "ABUSIVE" | "OFF_TOPIC" | "PLAGIARISM" | "OTHER".
+  reason         String
+  note           String     @default("")
+  /// "OPEN" | "DISMISSED" | "ACTIONED".
+  status         String     @default("OPEN")
+  resolutionNote String?
+  resolvedAt     DateTime?
+  resolvedById   String?
+  createdAt      DateTime   @default(now())
+
+  @@index([threadId, status])
+  @@index([targetId])
+  @@index([institutionId, status])
 }
 
 model CourseReview {
