@@ -188,12 +188,11 @@ export class EnrollmentService {
       },
     });
 
-    if (isComplete) {
-      try {
-        await this.certificateService.generateCertificate(userId, courseId);
-      } catch (err) {
-        console.error("Auto certificate generation error:", err);
-      }
+    // Templates may require less than 100% — the issuer checks the course's auto-issue rules.
+    try {
+      await this.certificateService.autoIssue(userId, courseId);
+    } catch (err) {
+      console.error("Auto certificate generation error:", err);
     }
 
     return progressPercentage;

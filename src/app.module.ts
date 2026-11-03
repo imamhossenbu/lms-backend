@@ -44,6 +44,7 @@ import { AssignmentsModule } from "./assignments/assignments.module";
 import { QuizzesModule } from "./quizzes/quizzes.module";
 import { LiveClassesModule } from "./live-classes/live-classes.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { CertificatesModule } from "./certificates/certificates.module";
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
     LiveClassesModule,
     WorkspaceSettingsModule,
     NotificationsModule,
+    CertificatesModule,
   ],
   providers: [
     {
