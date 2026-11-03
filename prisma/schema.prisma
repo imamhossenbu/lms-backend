@@ -49,6 +49,7 @@ model User {
   orders                  Order[]
   liveClassesTaught       LiveClass[]            @relation("LiveClassInstructor")
   orderNotes              OrderNote[]            @relation("OrderNoteAuthor")
+  notificationDeliveries  NotificationDelivery[]
   /// Soft delete — hidden from lists and blocked from login.
   deletedAt               DateTime?
   lastLoginIp             String?
@@ -601,32 +602,116 @@ model AiSettings {
 }
 
 // --- Communication ---
+/// One in-app notification for one user (student inbox, admin inbox). Broadcast deliveries and template sends create these.
 model Notification {
   id        String   @id @default(uuid())
   userId    String
   title     String
   message   String
+  /// Legacy free-form type; template sends store the trigger (e.g. "CERTIFICATE_ISSUED"), broadcasts "BROADCAST".
   type      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  /// SaaS tenant of the recipient (null = legacy single-tenant data).
+  institutionId String?
+  /// ENROLLMENT | PAYMENT | SUBMISSION | COMMUNITY | LIVE_CLASS | CERTIFICATE | SYSTEM
+  category      String    @default("SYSTEM")
+  /// NORMAL | HIGH
+  priority      String    @default("NORMAL")
+  /// In-app link to the related page ("" = none).
+  href          String    @default("")
+  isArchived    Boolean   @default(false)
+  readAt        DateTime?
+  /// Set when this row was created by a broadcast (Announcement).
+  broadcastId   String?
+
+  @@index([userId, isRead])
+  @@index([broadcastId])
 }
 
+/// Automated notification template — one per trigger per institution (slug = "<institutionId|default>:<trigger-slug>").
 model NotificationTemplate {
   id      String @id @default(uuid())
   slug    String @unique
+  /// Subject / in-app title with {placeholders}.
   title   String
+  /// Body with {placeholders} (plain text with line breaks).
   message String
   type    String
+
+  institutionId String?
+  /// TemplateTrigger (null on legacy rows).
+  trigger       String?
+  name          String   @default("")
+  /// IN_APP | EMAIL | PUSH
+  channels      String[] @default(["IN_APP"])
+  enabled       Boolean  @default(true)
+  /// Security emails (password reset) can't be disabled.
+  locked        Boolean  @default(false)
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([institutionId, trigger])
 }
 
+/// Admin broadcast (panel "Broadcast"). Legacy rows are per-course announcements (courseId + message).
 model Announcement {
   id         String   @id @default(uuid())
+  /// Legacy single course; "" for broadcasts that don't target exactly one course (see courseIds).
   courseId   String
+  /// User id of the author.
   createdBy  String
   title      String
+  /// Plain-text copy of the message (legacy readers); messageHtml is the rich source.
   message    String
   targetRole String
   createdAt  DateTime @default(now())
+
+  institutionId  String?
+  messageHtml    String    @default("")
+  /// ALL_STUDENTS | COURSE | INSTRUCTORS | INACTIVE_STUDENTS
+  audience       String    @default("COURSE")
+  courseIds      String[]  @default([])
+  /// IN_APP | EMAIL | PUSH
+  channels       String[]  @default(["IN_APP"])
+  priority       String    @default("NORMAL")
+  ctaLabel       String    @default("")
+  ctaUrl         String    @default("")
+  /// SENT | SCHEDULED | DRAFT | CANCELLED (legacy rows = SENT)
+  status         String    @default("SENT")
+  /// When it was / will be sent (null for drafts without a time).
+  sendAt         DateTime?
+  recipientCount Int       @default(0)
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  deliveries NotificationDelivery[]
+
+  @@index([institutionId, status])
+  @@index([status, sendAt])
+}
+
+/// One recipient × channel row of a sent broadcast (panel "BroadcastDelivery").
+model NotificationDelivery {
+  id             String       @id @default(uuid())
+  broadcastId    String
+  broadcast      Announcement @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// IN_APP | EMAIL | PUSH
+  channel        String
+  /// DELIVERED | OPENED | CLICKED | FAILED
+  status         String
+  error          String       @default("")
+  /// The in-app Notification row (IN_APP channel) — reading / clicking it updates this delivery.
+  notificationId String?
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([broadcastId, userId, channel])
+  @@index([notificationId])
+  @@index([userId])
 }
 
 // --- Payments & Settings ---

@@ -92,9 +92,7 @@ export class CertificateService {
       certNumber,
     );
 
-    await this.notificationService.notify(userId, "CERTIFICATE_ISSUED", {
-      courseName: course.title,
-    });
+    await this.notificationService.notify(userId, "CERTIFICATE_ISSUED", { course_title: course.title, certificate_url: certUrl });
 
     return newCert;
   }
