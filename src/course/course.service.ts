@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -116,7 +117,7 @@ export class CourseService {
   }
 
   async findOne(id: string) {
-    return await this.prisma.course.findUnique({
+    const course = await this.prisma.course.findUnique({
       where: { id },
       include: {
         category: true,
@@ -133,6 +134,8 @@ export class CourseService {
         },
       },
     });
+    if (!course) throw new NotFoundException("Course not found");
+    return course;
   }
 
   async update(
@@ -181,6 +184,17 @@ export class CourseService {
       );
     }
 
+    // Purchases and issued certificates are permanent records — such courses are unpublished, not deleted.
+    const [orders, certificates] = await Promise.all([
+      this.prisma.order.count({ where: { courseId: id } }),
+      this.prisma.certificate.count({ where: { courseId: id } }),
+    ]);
+    if (orders || certificates) {
+      const kept = [orders && `${orders} order${orders === 1 ? "" : "s"}`, certificates && `${certificates} certificate${certificates === 1 ? "" : "s"}`].filter(Boolean).join(" and ");
+      throw new ConflictException(`This course has ${kept}, so it can't be deleted. Set it to Draft to hide it instead.`);
+    }
+
+    // Modules, lessons, resources, reviews, enrollments, progress, quizzes, assignments and live classes cascade.
     return await this.prisma.course.delete({ where: { id } });
   }
 }

@@ -35,7 +35,10 @@ export class CourseModuleService {
     return await this.prisma.courseModule.update({ where: { id }, data: dto });
   }
 
+  /** Deletes the module with its lessons (and their resources / progress, which cascade). */
   async delete(id: string) {
+    const module = await this.prisma.courseModule.findUnique({ where: { id }, select: { id: true } });
+    if (!module) throw new NotFoundException("Module not found");
     return await this.prisma.courseModule.delete({ where: { id } });
   }
 }
