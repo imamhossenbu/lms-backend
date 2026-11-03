@@ -20,6 +20,7 @@ import {
 
 import { MailService } from "./mail/mail.service";
 import { TwoFactorService } from "./two-factor.service";
+import { TeamAccessService } from "../team/services/team-access.service";
 
 /** Purpose claim of the short-lived token between the password step and the 2FA code step. */
 const TWO_FACTOR_CHALLENGE = "2fa-login";
@@ -31,6 +32,7 @@ export class AuthService {
     private jwt: JwtService,
     private mailService: MailService,
     private twoFactor: TwoFactorService,
+    private teamAccess: TeamAccessService,
   ) {}
 
   // REGISTER
@@ -201,7 +203,9 @@ export class AuthService {
   // LOGIN
   /**
    * Password step. Accounts with 2FA get `{ twoFactorRequired, challengeToken }` (valid 5 minutes) and finish
-   * with POST /auth/2fa/login; everyone else gets `{ token }` straight away.
+   * with POST /auth/2fa/login; everyone else gets `{ token, twoFactorSetupRequired }` straight away.
+   * `twoFactorSetupRequired: true` = the workspace requires admin 2FA and this admin hasn't set it up:
+   * the panel should open 2FA setup (other admin endpoints answer 403 until then).
    */
   async login(dto: LoginDto, ip?: string) {
     const user = await this.prisma.user.findUnique({
@@ -283,12 +287,13 @@ export class AuthService {
   }
 
   /** Records the sign-in and returns the access token. */
-  private async issueSession(user: { id: string; email: string; role: string; institutionId: string | null }, ip?: string) {
+  private async issueSession(user: { id: string; email: string; role: string; institutionId: string | null; twoFactorEnabled: boolean }, ip?: string) {
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date(), ...(ip ? { lastLoginIp: ip } : {}) },
     });
     return {
+      twoFactorSetupRequired: await this.teamAccess.twoFactorSetupRequiredAtLogin(user),
       token: this.jwt.sign({
         sub: user.id,
         email: user.email,

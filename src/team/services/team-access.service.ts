@@ -13,6 +13,9 @@ import {
   type TeamModule,
 } from "../team-permissions";
 import type { MyTeamAccess, TeamEventView, TeamMemberView, TeamRoleView } from "../team.types";
+import { mustSetUpTwoFactor } from "../../workspace-settings/two-factor-policy";
+import { requireAdmin2faOf } from "../../workspace-settings/workspace-settings.rules";
+import { scopeKeyOf } from "../../workspace-settings/workspace-settings.mapper";
 
 export type Tx = Prisma.TransactionClient;
 export const STAFF_ROLE = "ADMIN";
@@ -36,6 +39,12 @@ export interface ActorContext {
   permissions: RolePermissions;
   /** Owner or Super Admin (locked role). */
   isSuperAdmin: boolean;
+  twoFactorEnabled: boolean;
+  /**
+   * Settings › Security requires admin 2FA and this member hasn't set it up: PermissionsGuard blocks every
+   * @RequirePermission endpoint except those marked @AllowPendingTwoFactor().
+   */
+  twoFactorSetupRequired: boolean;
 }
 
 export const rolePermissions = (r: Pick<TeamRole, "permissions">) => normalizePermissions(r.permissions as Partial<RolePermissions>);
@@ -152,7 +161,7 @@ export class TeamAccessService {
     if (user.role !== STAFF_ROLE) throw new ForbiddenException("Only admin-panel staff can do this.");
     const tenantId = user.institutionId ?? null;
     await this.ensureWorkspace(tenantId);
-    const member = await this.prisma.teamMember.findUnique({ where: { userId: user.userId }, include: { role: true, user: { select: { name: true } } } });
+    const member = await this.prisma.teamMember.findUnique({ where: { userId: user.userId }, include: { role: true, user: { select: { name: true, twoFactorEnabled: true } } } });
     if (!member || member.institutionId !== tenantId) throw new ForbiddenException("You're not a member of this workspace's team.");
     if (member.status !== "ACTIVE") throw new ForbiddenException("Your team access is suspended.");
     const permissions = effectivePermissions({ isOwner: member.isOwner, extraPermissions: memberExtras(member) }, { permissions: rolePermissions(member.role), isLocked: member.role.isLocked });
@@ -164,7 +173,35 @@ export class TeamAccessService {
       role: member.role,
       permissions,
       isSuperAdmin: member.isOwner || member.role.isLocked,
+      twoFactorEnabled: member.user?.twoFactorEnabled ?? false,
+      twoFactorSetupRequired: mustSetUpTwoFactor({
+        requireAdmin2fa: await this.requiresAdmin2fa(tenantId),
+        role: user.role,
+        twoFactorEnabled: member.user?.twoFactorEnabled ?? false,
+        isOwner: member.isOwner,
+        impersonatedBy: user.impersonatedBy,
+      }),
     };
+  }
+
+  /** Workspace setting Settings › Security › "Require two-factor for admins". */
+  async requiresAdmin2fa(tenantId: string | null): Promise<boolean> {
+    const row = await this.prisma.workspaceSettings.findUnique({ where: { scopeKey: scopeKeyOf(tenantId) }, select: { security: true } });
+    return requireAdmin2faOf(row?.security);
+  }
+
+  /**
+   * Login-time hint (`twoFactorSetupRequired` in the login response) so the panel can route straight to 2FA
+   * setup. No workspace bootstrap here: before the team exists nobody is known to be the owner, so the
+   * hint may be true for the future owner — the guard (after bootstrap) is what actually decides.
+   */
+  async twoFactorSetupRequiredAtLogin(user: { id: string; role: string; institutionId: string | null; twoFactorEnabled: boolean }): Promise<boolean> {
+    if (user.role !== STAFF_ROLE || user.twoFactorEnabled) return false;
+    const [member, requireAdmin2fa] = await Promise.all([
+      this.prisma.teamMember.findUnique({ where: { userId: user.id }, select: { isOwner: true } }),
+      this.requiresAdmin2fa(user.institutionId ?? null),
+    ]);
+    return mustSetUpTwoFactor({ requireAdmin2fa, role: user.role, twoFactorEnabled: user.twoFactorEnabled, isOwner: member?.isOwner ?? false });
   }
 
   can(ctx: Pick<ActorContext, "permissions">, module: TeamModule, action: PermissionAction) {
@@ -173,7 +210,15 @@ export class TeamAccessService {
 
   async myAccess(user: AuthUser): Promise<MyTeamAccess> {
     const ctx = await this.actor(user);
-    return { memberId: ctx.member.id, roleId: ctx.role.id, roleName: ctx.role.name, isOwner: ctx.member.isOwner, permissions: ctx.permissions };
+    return {
+      memberId: ctx.member.id,
+      roleId: ctx.role.id,
+      roleName: ctx.role.name,
+      isOwner: ctx.member.isOwner,
+      permissions: ctx.permissions,
+      twoFactorEnabled: ctx.twoFactorEnabled,
+      twoFactorSetupRequired: ctx.twoFactorSetupRequired,
+    };
   }
 
   // ---------------------------------------------------------------- lookups within the actor's workspace
