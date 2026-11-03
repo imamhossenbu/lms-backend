@@ -1,53 +1,21 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Param,
-  Body,
-  UseGuards,
-  Req,
-} from "@nestjs/common";
+import { Controller, Get, Param, ParseUUIDPipe } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { CurrentUser, RequireRoles, type AuthUser } from "../common/auth-user";
 import { AnnouncementService } from "./announcement.service";
-import { AuthGuard } from "@nestjs/passport";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
 
+/**
+ * Read-only course announcements for enrolled students (and staff). Admins create them as broadcasts
+ * at /admin/notifications/broadcasts (audience COURSE).
+ */
+@ApiTags("Announcements (student)")
 @Controller("announcement")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
+@RequireRoles("STUDENT", "TEACHER", "ADMIN")
 export class AnnouncementController {
-  constructor(private announcementService: AnnouncementService) {}
-
-  @Post()
-  @Roles("ADMIN", "TEACHER")
-  async create(@Body() body: any, @Req() req: any) {
-    return await this.announcementService.create({
-      ...body,
-      createdBy: req.user.userId,
-    });
-  }
-
-  @Get("all")
-  @Roles("ADMIN")
-  async getAll() {
-    return await this.announcementService.getAll();
-  }
+  constructor(private readonly announcementService: AnnouncementService) {}
 
   @Get(":courseId")
-  async getByCourse(@Param("courseId") courseId: string) {
-    return await this.announcementService.getAllByCourse(courseId);
-  }
-
-  @Patch(":id")
-  @Roles("ADMIN", "TEACHER")
-  async update(@Param("id") id: string, @Body() body: any) {
-    return await this.announcementService.update(id, body);
-  }
-
-  @Delete(":id")
-  @Roles("ADMIN")
-  async delete(@Param("id") id: string) {
-    return await this.announcementService.delete(id);
+  @ApiOperation({ summary: "Sent broadcasts that targeted this course, newest first" })
+  getByCourse(@CurrentUser() user: AuthUser, @Param("courseId", new ParseUUIDPipe({ errorHttpStatusCode: 404 })) courseId: string) {
+    return this.announcementService.getAllByCourse(user, courseId);
   }
 }

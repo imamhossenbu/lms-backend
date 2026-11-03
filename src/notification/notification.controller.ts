@@ -1,56 +1,58 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Param,
-  Body,
-  UseGuards,
-  Req,
-} from "@nestjs/common";
-import { NotificationService } from "./notification.service";
-import { AuthGuard } from "@nestjs/passport";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
+import { InboxQueryDto, MarkReadDto } from "../notifications/dto/inbox.dto";
+import { NotificationInboxService } from "../notifications/services/notification-inbox.service";
 
+const Id = () => Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
+
+/**
+ * The signed-in user's own notifications (students, instructors, staff). Admins manage broadcasts and
+ * templates at /admin/notifications.
+ */
+@ApiTags("Notifications (me)")
 @Controller("notification")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
+@RequireRoles("STUDENT", "TEACHER", "ADMIN")
+@ValidateDto()
 export class NotificationController {
-  constructor(private notificationService: NotificationService) {}
+  constructor(private readonly inbox: NotificationInboxService) {}
 
   @Get()
-  async getNotifications(@Req() req: any) {
-    return await this.notificationService.getMyNotifications(req.user.userId);
+  @ApiOperation({ summary: "My notifications, newest first (status all / unread / archived, category, search)" })
+  list(@CurrentUser() user: AuthUser, @Query() q: InboxQueryDto) {
+    return this.inbox.list(user.userId, q);
+  }
+
+  @Get("unread-count")
+  unreadCount(@CurrentUser() user: AuthUser) {
+    return this.inbox.unreadCount(user.userId);
   }
 
   @Patch("read-all")
-  async markAllAsRead(@Req() req: any) {
-    return await this.notificationService.markAllAsRead(req.user.userId);
+  markAllAsRead(@CurrentUser() user: AuthUser) {
+    return this.inbox.markRead(user.userId, "all");
+  }
+
+  @Patch("read")
+  @ApiOperation({ summary: 'Mark ids (or "all") read / unread' })
+  markRead(@CurrentUser() user: AuthUser, @Body() dto: MarkReadDto) {
+    return this.inbox.markRead(user.userId, dto.ids, dto.isRead);
   }
 
   @Patch(":id/read")
-  async markAsRead(@Param("id") id: string, @Req() req: any) {
-    return await this.notificationService.markAsRead(id, req.user.userId);
+  markAsRead(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.inbox.markOneRead(user.userId, id);
   }
 
-  @Roles("ADMIN")
-  @Get("templates")
-  async getTemplates() {
-    return await this.notificationService.getAllTemplates();
+  @Post(":id/click")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Open a notification: marks it read and returns its link" })
+  click(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.inbox.click(user.userId, id);
   }
 
-  @Roles("ADMIN")
-  @Post("templates")
-  async createTemplate(@Body() body: any) {
-    return await this.notificationService.createTemplate(body);
-  }
-
-  @Roles("ADMIN")
-  @Patch("templates/:id")
-  async updateTemplate(
-    @Param("id") id: string,
-    @Body() body: { title: string; message: string },
-  ) {
-    return await this.notificationService.updateTemplate(id, body);
+  @Delete(":id")
+  remove(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.inbox.removeOne(user.userId, id);
   }
 }
