@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import type { SaasEventType, SaasSubscriptionStatus } from "../../../generated/prisma";
+import { quoteDiscount } from "../coupons/coupon-billing";
+import { CouponRedemptionsService } from "../coupons/services/coupon-redemptions.service";
 import type { PaymentMethodDto } from "../dto/subscription.dto";
 import { LIMIT_LABEL } from "../saas.constants";
-import { cycleLabel, DAY_MS, fmtDate, fmtLimitValue, money, periodEndFrom, planChangePreview, priceFor, subscriptionPrice } from "../saas.math";
+import { cycleLabel, DAY_MS, fmtDate, fmtLimitValue, money, periodEndFrom, planChangePreview, priceFor, round2, subscriptionPrice } from "../saas.math";
 import type { BillingCycle, InstitutionView, InvoiceView, SaasActorKind } from "../saas.types";
 import { SaasCoreService } from "./saas-core.service";
 import { SaasPaymentGateway } from "./saas-payment.gateway";
@@ -19,6 +21,7 @@ export class SaasSubscriptionService {
   constructor(
     private readonly core: SaasCoreService,
     private readonly gateway: SaasPaymentGateway,
+    private readonly coupons: CouponRedemptionsService,
   ) {}
 
   /** Read-only preview of a plan change (what `changePlan` would charge / block). */
@@ -31,8 +34,9 @@ export class SaasSubscriptionService {
   /**
    * Immediate plan / cycle change. Upgrades charge the prorated difference; a cycle switch starts a new period
    * (new price minus unused credit). Downgrades are free and rejected when usage exceeds the target limits.
+   * An optional `couponCode` is redeemed for the target plan / cycle and discounts this and later invoices.
    */
-  async changePlan(institutionId: string, planId: string, cycle: BillingCycle, actor: SaasActorKind): Promise<ChangePlanResult> {
+  async changePlan(institutionId: string, planId: string, cycle: BillingCycle, actor: SaasActorKind, couponCode?: string): Promise<ChangePlanResult> {
     return this.core.tx(async (tx) => {
       const inst = await this.core.mustInstitution(tx, institutionId);
       const target = await this.core.mustPlan(tx, planId);
@@ -53,6 +57,8 @@ export class SaasSubscriptionService {
         );
       if (target.priceMonthly === 0 && !(planId === s.planId && s.customPrice) && s.status !== "TRIALING")
         throw new BadRequestException(`${target.name} is custom-priced — agree a contract price before switching.`);
+
+      if (couponCode) await this.coupons.redeem(tx, couponCode, { institutionId, planId, cycle, actor });
 
       const fromName = plans.find((p) => p.id === s.planId)?.name ?? s.planId;
       const kind = preview.kind;
@@ -85,6 +91,7 @@ export class SaasSubscriptionService {
           periodStart: preview.resetsPeriod ? new Date(updated.subscription.currentPeriodStart) : now,
           periodEnd: new Date(updated.subscription.currentPeriodEnd),
           paid: !!updated.subscription.paymentMethod,
+          discount: await quoteDiscount(tx, institutionId, { planId, cycle, amount: preview.dueNow, at: now }),
           description: preview.resetsPeriod
             ? `${target.name} ${cycleLabel(cycle)} — new period less ${money(preview.credit)} unused credit`
             : `Prorated upgrade ${fromName} → ${target.name}`,
@@ -154,6 +161,7 @@ export class SaasSubscriptionService {
           periodEnd: new Date(updated.subscription.currentPeriodEnd),
           paid: !!updated.subscription.paymentMethod,
           description: `${plan.name} plan — ${cycleLabel(s.cycle)} subscription (reactivation)`,
+          discount: await quoteDiscount(tx, institutionId, { planId: plan.id, cycle: s.cycle, amount, at: now }),
         });
       return this.core.mustInstitution(tx, institutionId);
     });
@@ -203,8 +211,8 @@ export class SaasSubscriptionService {
     });
   }
 
-  /** Trial → paid: charges the first period now on the given payment method. */
-  async convertTrial(institutionId: string, planId: string, cycle: BillingCycle, pm: PaymentMethodDto, actor: SaasActorKind): Promise<InstitutionView> {
+  /** Trial → paid: charges the first period now (less any coupon discount) on the given payment method. */
+  async convertTrial(institutionId: string, planId: string, cycle: BillingCycle, pm: PaymentMethodDto, actor: SaasActorKind, couponCode?: string): Promise<InstitutionView> {
     return this.core.tx(async (tx) => {
       const inst = await this.core.mustInstitution(tx, institutionId);
       if (inst.subscription.status !== "TRIALING") throw new BadRequestException("This institution isn't on a trial.");
@@ -215,9 +223,12 @@ export class SaasSubscriptionService {
       const blockers = planChangePreview(await this.core.plans(tx), inst, planId, cycle).blockers;
       if (blockers.length)
         throw new BadRequestException(`Usage exceeds ${plan.name} limits (${blockers.map((b) => LIMIT_LABEL[b.key]).join(", ")}). Choose a bigger plan.`);
-      const charge = await this.gateway.charge(pm, amount);
-      if (!charge.ok) throw new BadRequestException(`${pm.brand} •••• ${pm.last4} was declined. Try another payment method.`);
+      if (couponCode) await this.coupons.redeem(tx, couponCode, { institutionId, planId, cycle, actor });
       const now = new Date();
+      const discount = await quoteDiscount(tx, institutionId, { planId, cycle, amount, at: now });
+      const due = round2(amount - (discount?.amount ?? 0));
+      const charge = due > 0 ? await this.gateway.charge(pm, due) : { ok: true as const };
+      if (!charge.ok) throw new BadRequestException(`${pm.brand} •••• ${pm.last4} was declined. Try another payment method.`);
       await tx.institution.update({
         where: { id: institutionId },
         data: {
@@ -241,6 +252,7 @@ export class SaasSubscriptionService {
         periodEnd: new Date(updated.subscription.currentPeriodEnd),
         paid: true,
         description: `${plan.name} plan — ${cycleLabel(cycle)} subscription`,
+        discount,
       });
       return this.core.mustInstitution(tx, institutionId);
     });

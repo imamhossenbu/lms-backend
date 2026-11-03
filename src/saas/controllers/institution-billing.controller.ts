@@ -48,7 +48,7 @@ export class InstitutionBillingController {
   @Post("change-plan")
   @HttpCode(200)
   async changePlan(@CurrentUser() user: AuthUser, @Body() dto: ChangePlanDto) {
-    return this.subscriptions.changePlan(await this.tenant(user), dto.planId, dto.cycle, "Institution");
+    return this.subscriptions.changePlan(await this.tenant(user), dto.planId, dto.cycle, "Institution", dto.couponCode);
   }
 
   @Post("cancel")
@@ -66,7 +66,7 @@ export class InstitutionBillingController {
   @Post("convert-trial")
   @HttpCode(200)
   async convertTrial(@CurrentUser() user: AuthUser, @Body() dto: ConvertTrialDto) {
-    return this.subscriptions.convertTrial(await this.tenant(user), dto.planId, dto.cycle, dto.paymentMethod, "Institution");
+    return this.subscriptions.convertTrial(await this.tenant(user), dto.planId, dto.cycle, dto.paymentMethod, "Institution", dto.couponCode);
   }
 
   @Patch("payment-method")

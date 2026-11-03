@@ -104,6 +104,8 @@ export function toInvoiceView(v: SaasInvoice): InvoiceView {
     periodStart: iso(v.periodStart),
     periodEnd: iso(v.periodEnd),
     ...(v.description ? { description: v.description } : {}),
+    discount: num(v.discount),
+    couponCode: v.couponCode,
   };
 }
 

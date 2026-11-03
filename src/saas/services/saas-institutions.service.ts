@@ -3,6 +3,8 @@ import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import type { Prisma } from "../../../generated/prisma";
 import { MailService } from "../../auth/mail/mail.service";
+import { CouponRedemptionsService } from "../coupons/services/coupon-redemptions.service";
+import type { CouponRedemptionView } from "../coupons/coupons.types";
 import type { CreateInstitutionDto, UpdateInstitutionDto } from "../dto/institution.dto";
 import type { SignupDto } from "../dto/signup.dto";
 import { INSTITUTION_ADMIN_ROLE, isReservedSlug, MAX_EVENTS_IN_SNAPSHOT, SAAS_ROOT_DOMAIN, SAAS_TRIAL_DAYS, SLUG_REGEX, TONES } from "../saas.constants";
@@ -35,6 +37,7 @@ export class SaasInstitutionsService {
     private readonly core: SaasCoreService,
     private readonly jwt: JwtService,
     private readonly mail: MailService,
+    private readonly coupons: CouponRedemptionsService,
   ) {}
 
   private get prisma() {
@@ -163,16 +166,18 @@ export class SaasInstitutionsService {
   /**
    * Public self-signup: creates a TRIALING institution (plan trial length) and its ADMIN user (PENDING until the
    * 6-digit email code is verified via POST /auth/verify-email — same flow as normal registration).
+   * Trial length: the plan's, else Console settings › Trials › default trial days. An optional `couponCode`
+   * is redeemed in the same transaction (an invalid code rejects the signup with the coupon message).
    */
-  async signup(v: SignupDto): Promise<{ institution: InstitutionView; email: string; message: string }> {
+  async signup(v: SignupDto): Promise<{ institution: InstitutionView; coupon: CouponRedemptionView | null; email: string; message: string }> {
     const hashed = await bcrypt.hash(v.password, 10);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const institution = await this.core.tx(async (tx) => {
+    const { institution, coupon } = await this.core.tx(async (tx) => {
       const plan = await this.core.mustPlan(tx, v.planId);
       if (plan.archived || !plan.isPublic) throw new BadRequestException("This plan isn't available for self-signup.");
       const existingUser = await tx.user.findFirst({ where: { email: { equals: v.email, mode: "insensitive" } }, select: { id: true } });
       if (existingUser) throw new ConflictException("An account with this email already exists — sign in instead.");
-      const trialDays = plan.trialDays || SAAS_TRIAL_DAYS;
+      const trialDays = plan.trialDays || (await this.core.trialSettings(tx)).defaultTrialDays || SAAS_TRIAL_DAYS;
       const inst = await this.build(
         tx,
         { name: v.institutionName, type: v.type, country: v.country, ownerName: v.name, ownerEmail: v.email, phone: "", slug: v.slug, planId: v.planId, cycle: v.cycle, notes: "" },
@@ -184,14 +189,15 @@ export class SaasInstitutionsService {
       });
       await this.core.event(tx, inst.id, "SIGNED_UP", `${inst.name} signed up at ${inst.slug}.${SAAS_ROOT_DOMAIN}`, "Institution");
       await this.core.event(tx, inst.id, "TRIAL_STARTED", `${trialDays}-day free trial started on ${plan.name}`, "System");
-      return inst;
+      const coupon = v.couponCode ? await this.coupons.redeem(tx, v.couponCode, { institutionId: inst.id, planId: plan.id, cycle: v.cycle, actor: "Institution" }) : null;
+      return { institution: inst, coupon };
     });
     try {
       await this.mail.sendVerificationEmail(v.email, otp);
     } catch (err: any) {
       this.logger.warn(`Signup verification email failed for ${v.email}: ${err?.message ?? err}`);
     }
-    return { institution, email: v.email, message: "Workspace created. Check your email for the 6-digit verification code." };
+    return { institution, coupon, email: v.email, message: "Workspace created. Check your email for the 6-digit verification code." };
   }
 
   // ---------------------------------------------------------------- edit

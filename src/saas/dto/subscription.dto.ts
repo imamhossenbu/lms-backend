@@ -1,11 +1,14 @@
 import { Transform, Type } from "class-transformer";
 import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from "class-validator";
+import { IsOptionalCouponCode } from "../coupons/dto/coupon.dto";
 import { HOSTNAME_REGEX, PAYMENT_BRANDS, type PaymentBrand } from "../saas.constants";
 import { IsCycle, IsPlanId, Trim } from "./common";
 
 export class ChangePlanDto {
   @IsPlanId() planId!: string;
   @IsCycle() cycle!: "MONTHLY" | "YEARLY";
+  /** Optional platform coupon redeemed with the change (ignored by the preview endpoint). */
+  @IsOptionalCouponCode() couponCode?: string;
 }
 
 export class CancelSubscriptionDto {
@@ -47,6 +50,9 @@ export class ConvertTrialDto {
   @ValidateNested()
   @Type(() => PaymentMethodDto)
   paymentMethod!: PaymentMethodDto;
+
+  /** Optional platform coupon; the first charge is already discounted. */
+  @IsOptionalCouponCode() couponCode?: string;
 }
 
 export class CustomDomainDto {

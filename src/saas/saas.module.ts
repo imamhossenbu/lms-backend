@@ -2,6 +2,14 @@ import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { MailService } from "../auth/mail/mail.service";
 import { PrismaModule } from "../prisma/prisma.module";
+import { OwnerAlertsController } from "./alerts/owner-alerts.controller";
+import { AlertsService } from "./alerts/alerts.service";
+import { OwnerConsoleSettingsController } from "./console-settings/owner-console-settings.controller";
+import { ConsoleSettingsReader } from "./console-settings/services/console-settings-reader.service";
+import { ConsoleSettingsService } from "./console-settings/services/console-settings.service";
+import { OwnerCouponsController } from "./coupons/owner-coupons.controller";
+import { CouponRedemptionsService } from "./coupons/services/coupon-redemptions.service";
+import { CouponsService } from "./coupons/services/coupons.service";
 import { InstitutionBillingController } from "./controllers/institution-billing.controller";
 import { OwnerBillingController } from "./controllers/owner-billing.controller";
 import { OwnerInstitutionsController } from "./controllers/owner-institutions.controller";
@@ -21,6 +29,10 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
  *   /saas/public/*  pricing + self-signup (no auth)
  *   /saas/owner/*   Owner Console (role SUPER_ADMIN)
  *   /saas/me/*      institution admin billing (role ADMIN, scoped to the caller's institution)
+ * Owner Console extras live here too because they hook into the billing transactions:
+ *   coupons/          platform coupons (CRUD + redemption; discounts priced into SaasCoreService.addInvoice)
+ *   alerts/           live "needs attention" items + the owner's read-state
+ *   console-settings/ platform settings row (invoice prefix, fallback tax rate, default trial days feed billing)
  * SaasLifecycleService runs hourly: trial expiry, renewals and scheduled cancellations.
  */
 @Module({
@@ -28,7 +40,16 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     PrismaModule,
     JwtModule.register({ secret: process.env.SUPER_SECRET_KEY, signOptions: { expiresIn: "1d" } }),
   ],
-  controllers: [SaasPublicController, OwnerPlansController, OwnerInstitutionsController, OwnerBillingController, InstitutionBillingController],
+  controllers: [
+    SaasPublicController,
+    OwnerPlansController,
+    OwnerInstitutionsController,
+    OwnerBillingController,
+    InstitutionBillingController,
+    OwnerCouponsController,
+    OwnerAlertsController,
+    OwnerConsoleSettingsController,
+  ],
   providers: [
     SaasCoreService,
     SaasPaymentGateway,
@@ -39,6 +60,11 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     SaasDomainsService,
     SaasLifecycleService,
     MailService,
+    ConsoleSettingsReader,
+    ConsoleSettingsService,
+    CouponsService,
+    CouponRedemptionsService,
+    AlertsService,
   ],
   exports: [SaasCoreService, SaasPlansService, SaasInstitutionsService],
 })
