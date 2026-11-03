@@ -20,48 +20,48 @@ model User {
   verificationToken String?   @unique
   lastLoginAt       DateTime?
 
-  bio           String?
-  education     String?
-  skills        String?
-  interests     String?
-  country       String?
-  language      String?
-  socialLinks   String?
-  address       String?
+  bio          String?
+  education    String?
+  skills       String?
+  interests    String?
+  country      String?
+  language     String?
+  socialLinks  String?
+  address      String?
   /// Professional title shown on instructor profiles, e.g. "Senior Web Developer".
-  headline      String?
+  headline     String?
   /// Main subject area, e.g. "Web Development".
-  expertise     String?
-  certificates  Certificate[]
-  attendances   Attendance[]
+  expertise    String?
+  certificates Certificate[]
+  attendances  Attendance[]
 
-  enrollments      Enrollment[]
-  quizAttempts     QuizAttempt[]
-  submissions      AssignmentSubmission[]
-  lessonProgress   LessonProgress[]
-  coursesTeaching  Course[]        @relation("CourseInstructor")
-  notesAbout       StudentNote[]   @relation("NoteStudent")
-  notesAuthored    StudentNote[]   @relation("NoteAuthor")
-  instructorNotesAbout    InstructorNote[] @relation("InstructorNoteInstructor")
-  instructorNotesAuthored InstructorNote[] @relation("InstructorNoteAuthor")
-  reviews          CourseReview[]
-  orders           Order[]
-  liveClassesTaught LiveClass[]    @relation("LiveClassInstructor")
-  orderNotes       OrderNote[]     @relation("OrderNoteAuthor")
+  enrollments             Enrollment[]
+  quizAttempts            QuizAttempt[]
+  submissions             AssignmentSubmission[]
+  lessonProgress          LessonProgress[]
+  coursesTeaching         Course[]               @relation("CourseInstructor")
+  notesAbout              StudentNote[]          @relation("NoteStudent")
+  notesAuthored           StudentNote[]          @relation("NoteAuthor")
+  instructorNotesAbout    InstructorNote[]       @relation("InstructorNoteInstructor")
+  instructorNotesAuthored InstructorNote[]       @relation("InstructorNoteAuthor")
+  reviews                 CourseReview[]
+  orders                  Order[]
+  liveClassesTaught       LiveClass[]            @relation("LiveClassInstructor")
+  orderNotes              OrderNote[]            @relation("OrderNoteAuthor")
   /// Soft delete — hidden from lists and blocked from login.
-  deletedAt        DateTime?
-  lastLoginIp      String?
+  deletedAt               DateTime?
+  lastLoginIp             String?
 
   // Two-factor authentication (TOTP). The secret is AES-256-GCM encrypted (common/crypto.ts).
   twoFactorEnabled   Boolean   @default(false)
   twoFactorSecret    String?
   twoFactorEnabledAt DateTime?
 
-  teamMembership   TeamMember?     @relation("TeamMemberUser")
-  teamInvitesSent  TeamMember[]    @relation("TeamMemberInviter")
-  emailVerified Boolean       @default(false)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  teamMembership  TeamMember?  @relation("TeamMemberUser")
+  teamInvitesSent TeamMember[] @relation("TeamMemberInviter")
+  emailVerified   Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   // SaaS tenant this user belongs to (null for the platform owner / legacy users)
   institutionId String?
@@ -104,10 +104,10 @@ model Course {
   ratingAverage    Decimal  @default(0)
   totalStudents    Int      @default(0)
 
-  certificates Certificate[]
-  reviews      CourseReview[]
-  orders       Order[]
-  modules      CourseModule[]
+  certificates   Certificate[]
+  reviews        CourseReview[]
+  orders         Order[]
+  modules        CourseModule[]
   enrollments    Enrollment[]
   quizzes        Quiz[]
   assignments    Assignment[]
@@ -128,7 +128,8 @@ model CourseModule {
   createdAt       DateTime @default(now())
   durationMinutes Int      @default(0)
 
-  lessons Lesson[]
+  lessons     Lesson[]
+  assignments Assignment[]
 }
 
 model Lesson {
@@ -241,36 +242,134 @@ model QuizAttempt {
   @@index([quizId])
 }
 
+enum AssignmentType {
+  FILE_UPLOAD
+  TEXT
+  LINK
+}
+
+enum AssignmentDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum AssignmentGradingType {
+  POINTS
+  PASS_FAIL
+  LETTER
+  NOT_GRADED
+}
+
+enum LateSubmissionPolicy {
+  ALLOW
+  ALLOW_WITH_PENALTY
+  DISALLOW
+}
+
+enum AssignmentAvailability {
+  UNTIL_DUE
+  TIME_LIMIT
+  WINDOW
+}
+
+/// Course assignment. Columns from the first version (description, dueDate, marks, allowedFileTypes, status)
+/// keep their names; the admin panel calls them descriptionHtml, dueDate+dueTime, totalPoints, instructions.allowedFileTypes.
 model Assignment {
-  id               String   @id @default(uuid())
+  id               String        @id @default(uuid())
+  /// SaaS tenant. null = legacy single-tenant data.
+  institutionId    String?
   courseId         String
-  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessonId         String
+  course           Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleId         String?
+  module           CourseModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  /// "" = not tied to a lesson.
+  lessonId         String        @default("")
   title            String
+  /// Rich-text HTML (sanitized).
   description      String?
+  /// Due moment (the panel sends local "YYYY-MM-DD" + "HH:mm" in the workspace timezone).
   dueDate          DateTime
+  /// Total points.
   marks            Int
+  /// Comma-separated extensions without dots, e.g. "pdf,zip".
   allowedFileTypes String
+  /// "PUBLISHED" | "DRAFT".
   status           String
+
+  type              AssignmentType         @default(FILE_UPLOAD)
+  category          String                 @default("")
+  difficulty        AssignmentDifficulty   @default(BEGINNER)
+  estimatedTime     Float                  @default(0)
+  /// "MINUTES" | "HOURS".
+  estimatedUnit     String                 @default("HOURS")
+  instructionsHtml  String                 @default("")
+  /// { overview, objectives[], tasks[], requirements[], gradingNotes[] }
+  instructions      Json                   @default("{}")
+  /// [{ id, name, url, size, format }]
+  attachments       Json                   @default("[]")
+  /// { enabled, title, description, visibleToStudents, criteria[{ id, title, description, points, levels[] }] }
+  rubric            Json                   @default("{}")
+  maxFiles          Int                    @default(1)
+  maxFileSizeMb     Int                    @default(50)
+  /// null = unlimited attempts.
+  maxAttempts       Int?
+  lateSubmission    LateSubmissionPolicy   @default(ALLOW)
+  latePenalty       Float                  @default(0)
+  /// "PERCENT" | "POINTS".
+  latePenaltyUnit   String                 @default("PERCENT")
+  gradingType       AssignmentGradingType  @default(POINTS)
+  passingScore      Int?
+  /// "EXACT" | "GRADE_ONLY".
+  gradeDisplay      String                 @default("EXACT")
+  showRubric        Boolean                @default(false)
+  peerReview        Boolean                @default(false)
+  aiGradingEnabled  Boolean                @default(false)
+  aiGradingCriteria String                 @default("")
+  manualOverride    Boolean                @default(true)
+  /// When students can see it. null = immediately.
+  releaseAt         DateTime?
+  availability      AssignmentAvailability @default(UNTIL_DUE)
+  timeLimitMinutes  Int                    @default(60)
+  windowStartAt     DateTime?
+  windowEndAt       DateTime?
+  showInCalendar    Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @default(now()) @updatedAt
 
   submissions AssignmentSubmission[]
 
   @@index([courseId])
+  @@index([institutionId])
 }
 
 model AssignmentSubmission {
-  id            String     @id @default(uuid())
-  assignmentId  String
-  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fileUrl       String?
-  textAnswer    String?
-  submittedAt   DateTime   @default(now())
-  marksObtained Int?
-  feedback      String?
-  aiFeedback    String?
-  status        String
+  id               String     @id @default(uuid())
+  assignmentId     String
+  assignment       Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileUrl          String?
+  /// Original file name of the upload ("" for text / link answers).
+  fileName         String     @default("")
+  /// Text answer (TEXT) or the submitted URL (LINK).
+  textAnswer       String?
+  submittedAt      DateTime   @default(now())
+  /// 1-based attempt number for this student.
+  attempt          Int        @default(1)
+  /// Submitted after the due moment.
+  isLate           Boolean    @default(false)
+  timeTakenMinutes Int?
+  /// Score out of the assignment's total points. null until graded.
+  marksObtained    Float?
+  /// criterionId → points awarded.
+  criterionScores  Json       @default("{}")
+  feedback         String?
+  aiFeedback       String?
+  /// "PENDING" | "GRADED".
+  status           String
+  gradedAt         DateTime?
+  gradedById       String?
 
   @@index([userId])
   @@index([assignmentId])
@@ -408,10 +507,9 @@ model AiLearningRecommendation {
 //   isActive     Boolean @default(true)
 // }
 
-
 model AiSettings {
   id        String   @id @default(uuid())
-  settings  Json     
+  settings  Json
   updatedAt DateTime @updatedAt
 
   @@map("ai_settings")
@@ -581,6 +679,7 @@ model Attendance {
   status          String
 
   user User @relation(fields: [userId], references: [id])
+
   @@unique([userId, liveClassId])
 }
 
@@ -599,52 +698,42 @@ model ActivityLog {
 }
 
 model Setting {
-  id                 String  @id @default(uuid())
-  
-  
-  siteName           String
-  logo               String?
-  favicon            String?
-  defaultLanguage    String  @default("bn")
-  
+  id String @id @default(uuid())
+
+  siteName        String
+  logo            String?
+  favicon         String?
+  defaultLanguage String  @default("bn")
 
   allowRegistration  Boolean @default(true)
   certificateEnabled Boolean @default(true)
   aiEnabled          Boolean @default(false)
   maintenanceMode    Boolean @default(false)
 
+  primaryColor   String @default("#2563eb")
+  secondaryColor String @default("#64748b")
+  accentColor    String @default("#f59e0b")
 
-  
-  
-  primaryColor       String  @default("#2563eb")
-  secondaryColor     String  @default("#64748b")
-  accentColor        String  @default("#f59e0b")
-  
-
-  backgroundColor    String  @default("#ffffff")
-  surfaceColor       String  @default("#f8fafc")
-  textColor          String  @default("#1e293b")
-  textMutedColor     String  @default("#64748b")
-  
+  backgroundColor String @default("#ffffff")
+  surfaceColor    String @default("#f8fafc")
+  textColor       String @default("#1e293b")
+  textMutedColor  String @default("#64748b")
 
   headerBackgroundColor String @default("#ffffff")
   headerTextColor       String @default("#1e293b")
   footerBackgroundColor String @default("#1e293b")
   footerTextColor       String @default("#ffffff")
 
+  supportEmail String?
+  contactPhone String?
+  facebookUrl  String?
+  youtubeUrl   String?
 
-  supportEmail       String?
-  contactPhone       String?
-  facebookUrl        String?
-  youtubeUrl         String?
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-@@map("settings")
+  @@map("settings")
 }
-
 
 // =====================================================================
 // --- SaaS layer (multi-tenant subscriptions) ---
@@ -861,7 +950,6 @@ model SaasCounter {
   @@map("saas_counters")
 }
 
-
 // --- Student notes (admin panel › Student details › Notes) ---
 enum StudentNoteCategory {
   GOOD_PROGRESS
@@ -886,7 +974,6 @@ model StudentNote {
   @@index([studentId, createdAt])
   @@map("student_notes")
 }
-
 
 // --- Instructor notes (admin panel › Instructor details › Notes) ---
 enum InstructorNoteType {
@@ -925,7 +1012,6 @@ model InstructorNote {
   @@index([instructorId, createdAt])
   @@map("instructor_notes")
 }
-
 
 // =====================================================================
 // --- Team & Roles (admin-panel staff RBAC) ---
@@ -982,31 +1068,31 @@ model TeamRole {
 }
 
 model TeamMember {
-  id                String           @id @default(uuid())
-  institutionId     String?
+  id               String           @id @default(uuid())
+  institutionId    String?
   /// Set once the invitation is accepted (or for the workspace owner).
-  userId            String?          @unique
-  user              User?            @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
-  email             String
-  roleId            String
-  role              TeamRole         @relation(fields: [roleId], references: [id])
+  userId           String?          @unique
+  user             User?            @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  email            String
+  roleId           String
+  role             TeamRole         @relation(fields: [roleId], references: [id])
   /// Additive grants on top of the role (never repeats a role permission).
-  extraPermissions  Json
-  status            TeamMemberStatus
-  isOwner           Boolean          @default(false)
-  joinedAt          DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  extraPermissions Json
+  status           TeamMemberStatus
+  isOwner          Boolean          @default(false)
+  joinedAt         DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   // invitation (while status = INVITED)
   /// SHA-256 of the invitation token — the raw token is only ever in the email link.
-  inviteTokenHash   String?          @unique
+  inviteTokenHash   String?   @unique
   inviteSentAt      DateTime?
   inviteExpiresAt   DateTime?
   inviteMessage     String?
   invitedById       String?
-  invitedBy         User?            @relation("TeamMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
-  inviteResentCount Int              @default(0)
+  invitedBy         User?     @relation("TeamMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  inviteResentCount Int       @default(0)
 
   @@index([institutionId, status])
   @@index([institutionId, email])
@@ -1028,7 +1114,6 @@ model TeamEvent {
   @@index([institutionId, at])
   @@map("team_events")
 }
-
 
 // --- Order timeline + internal notes (admin panel › Orders / Payments) ---
 enum OrderEventType {

@@ -39,6 +39,7 @@ import { StudentsModule } from "./students/students.module";
 import { InstructorsModule } from "./instructors/instructors.module";
 import { TeamModule } from "./team/team.module";
 import { OrdersModule } from "./orders/orders.module";
+import { AssignmentsModule } from "./assignments/assignments.module";
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { OrdersModule } from "./orders/orders.module";
     InstructorsModule,
     TeamModule,
     OrdersModule,
+    AssignmentsModule,
   ],
   providers: [
     {

@@ -1,70 +1,48 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-  UseInterceptors,
-  UploadedFile,
-} from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { SubmitAssignmentDto } from "../assignments/dto/submission.dto";
+import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
 import { AssignmentService } from "./assignment.service";
-import { AuthGuard } from "@nestjs/passport";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { RolesGuard } from "../auth/guards/roles.guard";
 
+const Id = (name: string) => Param(name, new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
+
+/**
+ * Student side of assignments: read published work of enrolled courses, submit, see own submissions.
+ * Admins manage assignments and grade at /admin/assignments.
+ */
+@ApiTags("Assignments (student)")
 @Controller("assignment")
-@UseGuards(AuthGuard("jwt"))
+@RequireRoles("STUDENT", "ADMIN")
+@ValidateDto()
 export class AssignmentController {
   constructor(private readonly service: AssignmentService) {}
 
-  @Post()
-  @UseGuards(RolesGuard)
-  @Roles("TEACHER", "ADMIN")
-  async create(@Body() body: any) {
-    return this.service.create(body);
-  }
-
   @Get("my-submissions")
-  async getMySubmissions(@Req() req: any) {
-    return this.service.getMySubmissions(req.user.userId);
+  getMySubmissions(@CurrentUser() user: AuthUser) {
+    return this.service.getMySubmissions(user.userId);
   }
 
   @Get("course/:courseId")
-  async findAll(@Param("courseId") courseId: string) {
-    return this.service.findAll(courseId);
+  @ApiOperation({ summary: "Published assignments of a course the student is enrolled in" })
+  findAll(@CurrentUser() user: AuthUser, @Id("courseId") courseId: string) {
+    return this.service.findAll(user, courseId);
   }
 
   @Get(":id")
-  async findOne(@Param("id") id: string) {
-    return this.service.findOne(id);
-  }
-
-  @Get(":assignmentId/submissions")
-  @UseGuards(RolesGuard)
-  @Roles("TEACHER", "ADMIN")
-  async getSubmissions(@Param("assignmentId") assignmentId: string) {
-    return this.service.getSubmissionsByAssignment(assignmentId);
+  findOne(@CurrentUser() user: AuthUser, @Id("id") id: string) {
+    return this.service.findOne(user, id);
   }
 
   @Post(":assignmentId/submit")
-  @UseInterceptors(FileInterceptor("file"))
-  async submit(
-    @Param("assignmentId") assignmentId: string,
-    @Req() req: any,
-    @Body() dto: any,
-    @UploadedFile() file: Express.Multer.File,
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 500 * 1024 * 1024 } }))
+  submit(
+    @CurrentUser() user: AuthUser,
+    @Id("assignmentId") assignmentId: string,
+    @Body() dto: SubmitAssignmentDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.service.submit(assignmentId, req.user.userId, dto, file);
-  }
-
-  @Patch("grade/:submissionId")
-  @UseGuards(RolesGuard)
-  @Roles("TEACHER", "ADMIN")
-  async grade(@Param("submissionId") id: string, @Body() body: any) {
-    return this.service.grade(id, body);
+    return this.service.submit(user, assignmentId, dto, file);
   }
 }
