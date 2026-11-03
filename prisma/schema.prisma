@@ -20,20 +20,21 @@ model User {
   verificationToken String?   @unique
   lastLoginAt       DateTime?
 
-  bio          String?
-  education    String?
-  skills       String?
-  interests    String?
-  country      String?
-  language     String?
-  socialLinks  String?
-  address      String?
+  bio           String?
+  education     String?
+  skills        String?
+  interests     String?
+  country       String?
+  language      String?
+  socialLinks   String?
+  address       String?
   /// Professional title shown on instructor profiles, e.g. "Senior Web Developer".
-  headline     String?
+  headline      String?
   /// Main subject area, e.g. "Web Development".
-  expertise    String?
-  certificates Certificate[]
-  attendances  Attendance[]
+  expertise     String?
+  certificates  Certificate[]
+  attendances   Attendance[]
+  liveQuestions LiveQuestion[]
 
   enrollments             Enrollment[]
   quizAttempts            QuizAttempt[]
@@ -735,36 +736,138 @@ model Invoice {
 }
 
 // --- Logs & System ---
+/// Live class. First-version columns keep their names: description (descriptionHtml), meetingUrl (meetingLink),
+/// startTime/endTime (instants; the panel sends a workspace-local date + "HH:mm" times).
+/// status: "ACTIVE" | "CANCELLED" (legacy "SCHEDULED"/"COMPLETED" read as ACTIVE) — LIVE/UPCOMING/… are derived from the clock.
 model LiveClass {
-  id           String   @id @default(uuid())
-  courseId     String
-  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  instructorId String
-  instructor   User     @relation("LiveClassInstructor", fields: [instructorId], references: [id])
-  title        String
-  description  String?
-  meetingUrl   String
-  startTime    DateTime
-  endTime      DateTime
-  recordingUrl String?
-  status       String
+  id                 String    @id @default(uuid())
+  /// SaaS tenant. null = legacy single-tenant data.
+  institutionId      String?
+  courseId           String
+  course             Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructorId       String
+  instructor         User      @relation("LiveClassInstructor", fields: [instructorId], references: [id])
+  title              String
+  description        String?
+  meetingUrl         String
+  startTime          DateTime
+  endTime            DateTime
+  recordingUrl       String?
+  status             String
+  /// "INTERACTIVE" | "WEBINAR" | "WORKSHOP" | "QA".
+  type               String    @default("INTERACTIVE")
+  /// "ZOOM" | "GOOGLE_MEET" | "TEAMS" | "CUSTOM".
+  platform           String    @default("CUSTOM")
+  meetingId          String    @default("")
+  passcode           String    @default("")
+  sendLinkToStudents Boolean   @default(true)
+  /// Max seats; 0 = every enrolled student.
+  capacity           Int       @default(0)
+  /// { allowQa, enableChat, recordClass, makePublic, sendReminder, autoAttendance }
+  settings           Json      @default("{}")
+  /// Minutes before start: "NONE" | "5" | "15" | "30" | "60" | "1440".
+  reminder           String    @default("NONE")
+  reminderSentAt     DateTime?
+  thumbnailUrl       String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+
+  attendances Attendance[]
+  questions   LiveQuestion[]
+  resources   LiveResource[]
+  events      LiveClassEvent[]
 
   @@index([instructorId, startTime])
   @@index([courseId])
+  @@index([institutionId, startTime])
 }
 
+/// One row per student who joined, confirmed (RSVP) or was marked by an admin.
+/// status: "ACTIVE" (in the room) | "COMPLETED" (left) | "SUSPENDED" | "ATTENDED" (marked) → Attended;
+///         "ABSENT" (marked) → Absent; "RSVP" → Absent once the class has ended.
 model Attendance {
   id              String    @id @default(uuid())
   liveClassId     String
+  liveClass       LiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
   userId          String
-  joinedAt        DateTime
+  /// null = never joined (RSVP / marked absent).
+  joinedAt        DateTime?
   leftAt          DateTime?
   durationMinutes Int
   status          String
+  createdAt       DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, liveClassId])
+  @@index([liveClassId])
+}
+
+/// Q&A tab: a student's question during a class.
+model LiveQuestion {
+  id           String    @id @default(uuid())
+  liveClassId  String
+  liveClass    LiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question     String
+  /// "PENDING" | "ANSWERED".
+  status       String    @default("PENDING")
+  answerHtml   String    @default("")
+  answeredById String?
+  answeredAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([liveClassId, createdAt])
+}
+
+/// Resources tab: recordings, documents, links, code shared with the class.
+model LiveResource {
+  id          String    @id @default(uuid())
+  liveClassId String
+  liveClass   LiveClass @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
+  /// "RECORDING" | "DOCUMENT" | "LINK" | "CODE".
+  type        String
+  title       String
+  description String    @default("")
+  url         String
+  /// Bytes; 0 for links.
+  size        Int       @default(0)
+  /// "ALL_STUDENTS" | "ATTENDEES" | "HIDDEN".
+  visibility  String    @default("ALL_STUDENTS")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([liveClassId])
+}
+
+enum LiveClassEventKind {
+  CLASS_STARTED
+  STUDENTS_JOINED
+  QUESTION_ASKED
+  QUESTION_ANSWERED
+  SCREEN_SHARED
+  RESOURCE_SHARED
+  CLASS_ENDED
+  CLASS_SCHEDULED
+  CLASS_UPDATED
+  CLASS_CANCELLED
+}
+
+/// Activity tab.
+model LiveClassEvent {
+  id          String             @id @default(uuid())
+  liveClassId String
+  liveClass   LiveClass          @relation(fields: [liveClassId], references: [id], onDelete: Cascade)
+  kind        LiveClassEventKind
+  title       String
+  detail      String
+  actorName   String
+  /// Question / resource id the entry points at.
+  refId       String?
+  createdAt   DateTime           @default(now())
+
+  @@index([liveClassId, createdAt])
 }
 
 model ActivityLog {

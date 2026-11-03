@@ -1,119 +1,59 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import type { AuthUser } from "../common/auth-user";
+import { ATTENDED_ROW_STATUSES } from "../live-classes/live-classes.constants";
+import { LiveClassEventsService } from "../live-classes/services/live-class-events.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class AttendanceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: LiveClassEventsService,
+  ) {}
 
-  async checkIn(userId: string, liveClassId: string) {
-    const liveClass = await this.prisma.liveClass.findUnique({
-      where: { id: liveClassId },
-      select: { id: true, courseId: true, endTime: true, startTime: true },
-    });
+  /** Join a running class. Re-joining keeps the first join time. */
+  async checkIn(user: AuthUser, liveClassId: string) {
+    const c = await this.prisma.liveClass.findUnique({ where: { id: liveClassId }, select: { id: true, courseId: true, startTime: true, endTime: true, status: true } });
+    if (!c) throw new NotFoundException("Live class not found.");
+    if (c.status === "CANCELLED") throw new BadRequestException("This class was cancelled.");
+    const now = Date.now();
+    if (now < c.startTime.getTime()) throw new BadRequestException("This class has not started yet.");
+    if (now > c.endTime.getTime()) throw new BadRequestException("This class has already ended.");
+    const enrolled = await this.prisma.enrollment.findUnique({ where: { userId_courseId: { userId: user.userId, courseId: c.courseId } }, select: { id: true } });
+    if (!enrolled) throw new ForbiddenException("You are not enrolled in this course.");
 
-    if (!liveClass) {
-      throw new NotFoundException("Live class not found.");
+    const key = { userId_liveClassId: { userId: user.userId, liveClassId } };
+    const existing = await this.prisma.attendance.findUnique({ where: key });
+    if (existing?.joinedAt && ATTENDED_ROW_STATUSES.includes(existing.status)) {
+      return this.prisma.attendance.update({ where: { id: existing.id }, data: { status: "ACTIVE", leftAt: null } });
     }
-
-    const currentTime = new Date().getTime();
-
-    const startTime = new Date(liveClass.startTime).getTime();
-    const endTime = new Date(liveClass.endTime).getTime();
-
-    if (currentTime < startTime) {
-      throw new BadRequestException("This class has not started yet.");
-    }
-
-    if (currentTime > endTime) {
-      throw new BadRequestException("This class has already ended.");
-    }
-
-    const enrollment = await this.prisma.enrollment.findFirst({
-      where: {
-        userId,
-        courseId: liveClass.courseId,
-        status: "ACTIVE",
-      },
+    const row = await this.prisma.attendance.upsert({
+      where: key,
+      create: { liveClassId, userId: user.userId, joinedAt: new Date(), durationMinutes: 0, status: "ACTIVE" },
+      update: { joinedAt: new Date(), leftAt: null, status: "ACTIVE" },
+      include: { user: { select: { name: true } } },
     });
-
-    if (!enrollment) {
-      throw new BadRequestException("You are not enrolled in this course.");
-    }
-
-    return await this.prisma.attendance.upsert({
-      where: {
-        userId_liveClassId: {
-          userId,
-          liveClassId,
-        },
-      },
-      create: {
-        liveClassId,
-        userId,
-        joinedAt: new Date(),
-        durationMinutes: 0,
-        status: "ACTIVE",
-      },
-      update: {},
-    });
+    await this.events.log(liveClassId, "STUDENTS_JOINED", "Student Joined", `${row.user.name} joined the class.`, row.user.name);
+    return row;
   }
 
-  async ping(id: string) {
-    try {
-      const record = await this.prisma.attendance.findUnique({
-        where: { id },
-      });
-
-      if (!record || record.status === "SUSPENDED") {
-        return { message: "Attendance inactive or suspended" };
-      }
-
-      return await this.prisma.attendance.update({
-        where: { id },
-        data: { durationMinutes: { increment: 1 } },
-      });
-    } catch (error) {
-      console.error("Database connection error:", error);
-      throw new Error("Database connection lost. Please try again.");
-    }
+  /** Heartbeat: +1 watched minute while the class runs. */
+  async ping(user: AuthUser, id: string) {
+    const row = await this.mustOwn(user, id);
+    if (row.status !== "ACTIVE") throw new BadRequestException("You're not in this class right now.");
+    if (row.liveClass.endTime.getTime() < Date.now()) throw new BadRequestException("This class has already ended.");
+    return this.prisma.attendance.update({ where: { id }, data: { durationMinutes: { increment: 1 } } });
   }
 
-  async updateStatus(id: string, status: "ACTIVE" | "SUSPENDED") {
-    return await this.prisma.attendance.update({
-      where: { id },
-      data: { status },
-    });
+  async checkOut(user: AuthUser, id: string) {
+    const row = await this.mustOwn(user, id);
+    if (row.status !== "ACTIVE") return row;
+    return this.prisma.attendance.update({ where: { id }, data: { leftAt: new Date(), status: "COMPLETED" } });
   }
 
-  async checkOut(id: string) {
-    return await this.prisma.attendance.update({
-      where: { id },
-      data: { leftAt: new Date(), status: "COMPLETED" },
-    });
-  }
-
-  async getByLiveClassId(liveClassId: string) {
-    return await this.prisma.attendance.findMany({
-      where: { liveClassId },
-      include: {
-        user: true,
-      },
-      orderBy: { joinedAt: "desc" },
-    });
-  }
-
-  async updateDuration(id: string, minutes: number) {
-    return await this.prisma.attendance.update({
-      where: { id },
-      data: { durationMinutes: minutes },
-    });
-  }
-
-  async remove(id: string) {
-    return await this.prisma.attendance.delete({ where: { id } });
+  private async mustOwn(user: AuthUser, id: string) {
+    const row = await this.prisma.attendance.findUnique({ where: { id }, include: { liveClass: { select: { endTime: true } } } });
+    if (!row || row.userId !== user.userId) throw new NotFoundException("Attendance record not found.");
+    return row;
   }
 }

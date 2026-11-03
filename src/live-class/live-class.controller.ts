@@ -1,51 +1,38 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-} from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
+import { AskQuestionDto } from "../live-classes/dto/live-class.dto";
 import { LiveClassService } from "./live-class.service";
-import { CreateLiveClassDto, UpdateLiveClassDto } from "./dto/live-class.dto";
-import { AuthGuard } from "@nestjs/passport";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
 
+const Uuid = (name: string) => Param(name, new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
+
+/** Student side of live classes: schedule of a course, RSVP, ask questions, shared resources. */
+@ApiTags("Live classes (student)")
 @Controller("live-class")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
+@RequireRoles("STUDENT", "ADMIN")
+@ValidateDto()
 export class LiveClassController {
-  constructor(private liveClassService: LiveClassService) {}
+  constructor(private readonly service: LiveClassService) {}
 
-  @Post()
-  @Roles("TEACHER", "ADMIN")
-  async create(@Body() body: CreateLiveClassDto, @Req() req: any) {
-    return await this.liveClassService.create(req.user.userId, body);
+  @Get("course/:courseId")
+  @ApiOperation({ summary: "Classes of an enrolled course (meeting link only when shared with students)" })
+  byCourse(@CurrentUser() user: AuthUser, @Uuid("courseId") courseId: string) {
+    return this.service.listForCourse(user, courseId);
   }
 
-  @Get("all")
-  @Roles("ADMIN")
-  async getAll() {
-    return await this.liveClassService.findAll();
+  @Post(":id/rsvp")
+  @HttpCode(200)
+  rsvp(@CurrentUser() user: AuthUser, @Uuid("id") id: string) {
+    return this.service.rsvp(user, id);
   }
 
-  @Get(":courseId")
-  async getByCourse(@Param("courseId") courseId: string) {
-    return await this.liveClassService.getAllByCourse(courseId);
+  @Post(":id/questions")
+  ask(@CurrentUser() user: AuthUser, @Uuid("id") id: string, @Body() dto: AskQuestionDto) {
+    return this.service.ask(user, id, dto.question);
   }
 
-  @Patch(":id")
-  @Roles("TEACHER", "ADMIN")
-  async update(@Param("id") id: string, @Body() body: UpdateLiveClassDto) {
-    return await this.liveClassService.update(id, body);
-  }
-
-  @Delete(":id")
-  @Roles("ADMIN")
-  async delete(@Param("id") id: string) {
-    return await this.liveClassService.delete(id);
+  @Get(":id/resources")
+  resources(@CurrentUser() user: AuthUser, @Uuid("id") id: string) {
+    return this.service.resources(user, id);
   }
 }

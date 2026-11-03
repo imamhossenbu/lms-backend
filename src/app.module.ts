@@ -41,6 +41,7 @@ import { TeamModule } from "./team/team.module";
 import { OrdersModule } from "./orders/orders.module";
 import { AssignmentsModule } from "./assignments/assignments.module";
 import { QuizzesModule } from "./quizzes/quizzes.module";
+import { LiveClassesModule } from "./live-classes/live-classes.module";
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { QuizzesModule } from "./quizzes/quizzes.module";
     OrdersModule,
     AssignmentsModule,
     QuizzesModule,
+    LiveClassesModule,
   ],
   providers: [
     {

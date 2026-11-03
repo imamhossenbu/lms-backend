@@ -1,66 +1,36 @@
-import {
-  Controller,
-  Post,
-  Patch,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-  Get,
-  Delete,
-} from "@nestjs/common";
+import { Body, Controller, HttpCode, Param, ParseUUIDPipe, Patch, Post } from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
+import { IsUUID } from "class-validator";
+import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
 import { AttendanceService } from "./attendance.service";
-import { AuthGuard } from "@nestjs/passport";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { RolesGuard } from "../auth/guards/roles.guard";
 
+class CheckInDto {
+  @IsUUID("all", { message: "liveClassId must be a valid id" }) liveClassId!: string;
+}
+
+const Id = () => Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
+
+/** Students: join (check-in), once-a-minute heartbeat (ping), leave (check-out). Only on their own records. */
+@ApiTags("Attendance (student)")
 @Controller("attendance")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
+@RequireRoles("STUDENT")
+@ValidateDto()
 export class AttendanceController {
-  constructor(private attendanceService: AttendanceService) {}
+  constructor(private readonly attendance: AttendanceService) {}
 
-  
   @Post("check-in")
-  async checkIn(@Body("liveClassId") liveClassId: string, @Req() req: any) {
-    return await this.attendanceService.checkIn(req.user.userId, liveClassId);
+  checkIn(@CurrentUser() user: AuthUser, @Body() dto: CheckInDto) {
+    return this.attendance.checkIn(user, dto.liveClassId);
   }
 
   @Patch("ping/:id")
-  async ping(@Param("id") id: string) {
-    return await this.attendanceService.ping(id);
-  }
-
-  @Patch("status/:id")
-  async updateStatus(
-    @Param("id") id: string,
-    @Body("status") status: "ACTIVE" | "SUSPENDED",
-  ) {
-    return await this.attendanceService.updateStatus(id, status);
+  @HttpCode(200)
+  ping(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.attendance.ping(user, id);
   }
 
   @Patch("check-out/:id")
-  async checkOut(@Param("id") id: string) {
-    return await this.attendanceService.checkOut(id);
-  }
-
-  @Get("class/:liveClassId")
-  @Roles("ADMIN", "TEACHER")
-  async getByClass(@Param("liveClassId") liveClassId: string) {
-    return await this.attendanceService.getByLiveClassId(liveClassId);
-  }
-
-  @Patch("admin/update-duration/:id")
-  @Roles("ADMIN", "TEACHER")
-  async updateDuration(
-    @Param("id") id: string,
-    @Body("minutes") minutes: number,
-  ) {
-    return await this.attendanceService.updateDuration(id, minutes);
-  }
-
-  @Delete("admin/:id")
-  @Roles("ADMIN", "TEACHER")
-  async remove(@Param("id") id: string) {
-    return await this.attendanceService.remove(id);
+  checkOut(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.attendance.checkOut(user, id);
   }
 }
