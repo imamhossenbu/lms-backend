@@ -40,6 +40,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     super({
       adapter: new PrismaPg(pool),
+      // Interactive transactions need a fresh pooled connection; after idle sockets are dropped (15s) Neon can take
+      // longer than Prisma's 2s default to hand one out (P2028 "Unable to start a transaction in the given time").
+      transactionOptions: { maxWait: 10_000, timeout: 15_000 },
     });
 
     this.pool = pool;
