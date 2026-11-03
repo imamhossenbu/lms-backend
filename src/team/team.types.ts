@@ -71,4 +71,7 @@ export interface MyTeamAccess {
   roleName: string;
   isOwner: boolean;
   permissions: RolePermissions;
+  twoFactorEnabled: boolean;
+  /** Workspace requires admin 2FA and I haven't set it up — the panel should send me to 2FA setup. */
+  twoFactorSetupRequired: boolean;
 }

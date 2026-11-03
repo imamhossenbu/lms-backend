@@ -1,33 +1,20 @@
-import { Controller, Get, Patch, Body, UseGuards, Post } from "@nestjs/common";
+import { Controller, Get } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SettingsService } from "./settings.service";
-import { CreateSettingDto, UpdateSettingDto } from "./dto/settings.dto";
-import { AuthGuard } from "@nestjs/passport";
-import { RolesGuard } from "../auth/guards/roles.guard";
-import { Roles } from "../auth/decorators/roles.decorator";
 
+/**
+ * Legacy global site settings (the `settings` table) — public read only, kept for older clients.
+ * Editing moved to the per-workspace Admin › Settings API (/admin/settings, src/workspace-settings);
+ * new clients should read /settings/public.
+ */
+@ApiTags("Settings")
 @Controller("settings")
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
-
-  @Post()
-  @UseGuards(AuthGuard("jwt"), RolesGuard)
-  @Roles("ADMIN")
-  async create(@Body() createDto: CreateSettingDto) {
-    return await this.settingsService.createSettings(createDto);
-  }
-
-
   @Get()
-  async get() {
+  @ApiOperation({ summary: "Legacy site settings (deprecated — use /settings/public)", deprecated: true })
+  get() {
     return this.settingsService.getSettings();
-  }
-
-
-  @Patch()
-  @UseGuards(AuthGuard("jwt"), RolesGuard)
-  @Roles("ADMIN")
-  async update(@Body() data: UpdateSettingDto) {
-    return await this.settingsService.updateSettings(data);
   }
 }

@@ -922,6 +922,36 @@ model Setting {
   @@map("settings")
 }
 
+/// Admin panel › Settings — one row per workspace. Each section is stored as JSON in the panel's shape
+/// (src/workspace-settings/workspace-settings.types.ts); null = never saved → defaults. Secrets never live in
+/// the section JSON: they are AES-GCM encrypted in `secrets`.
+model WorkspaceSettings {
+  id               String   @id @default(uuid())
+  /// Tenant (null = legacy single-tenant workspace).
+  institutionId    String?
+  /// institutionId ?? "legacy" — makes "one row per workspace" enforceable (NULLs aren't unique).
+  scopeKey         String   @unique
+  general          Json?
+  branding         Json?
+  learning         Json?
+  payments         Json?
+  email            Json?
+  security         Json?
+  integrations     Json?
+  maintenance      Json?
+  /// "payments.stripe.secretKey" → { cipher: "v1.…", hint: "••••4e19" }.
+  secrets          Json     @default("{}")
+  /// Section → last saved ISO time.
+  sectionUpdatedAt Json     @default("{}")
+  /// Latest 50 changes: { id, section, summary, actor, at }.
+  audit            Json     @default("[]")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([institutionId])
+  @@map("workspace_settings")
+}
+
 // =====================================================================
 // --- SaaS layer (multi-tenant subscriptions) ---
 // Mirrors the frontend contract in lms-admin-panel/src/types/saas.ts.

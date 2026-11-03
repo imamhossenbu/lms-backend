@@ -27,6 +27,7 @@ import { APP_INTERCEPTOR } from "@nestjs/core";
 import { ActivityLogInterceptor } from "./activity-log/activity-log.interceptor";
 import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { SettingsModule } from "./settings/settings.module";
+import { WorkspaceSettingsModule } from "./workspace-settings/workspace-settings.module";
 import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
 import { AiModule } from "./ai/ai-service/ai.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
@@ -88,6 +89,7 @@ import { LiveClassesModule } from "./live-classes/live-classes.module";
     AssignmentsModule,
     QuizzesModule,
     LiveClassesModule,
+    WorkspaceSettingsModule,
   ],
   providers: [
     {
