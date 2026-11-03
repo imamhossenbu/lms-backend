@@ -3,7 +3,7 @@ import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { gradeDistribution, submissionCounts } from "./assignment-insights";
 import { assignmentRuleErrors, gradeErrors } from "./assignment-rules";
-import { instantToLocal, localToInstant } from "./assignment-schedule";
+import { instantToLocal, localToInstant } from "../common/workspace-time";
 import { attemptsToColumn, fileTypesFromColumn, fileTypesToColumn, toAssignmentData, toAssignmentItem } from "./assignment.mapper";
 import type { AssignmentFields, AssignmentSubmission } from "./assignments.types";
 import { CreateAssignmentDto, UpdateAssignmentDto } from "./dto/assignment.dto";

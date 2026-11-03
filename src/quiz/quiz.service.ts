@@ -1,207 +1,139 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import type { AuthUser } from "../common/auth-user";
 import { PrismaService } from "../prisma/prisma.service";
+import type { SubmitQuizDto } from "../quizzes/dto/attempt.dto";
+import { attemptLimitReason, quizClosedReason, shuffled } from "../quizzes/quiz-gate";
+import { gradeAttempt, missingRequired } from "../quizzes/quiz-grading";
+import { toQuizItem, type QuizWithQuestions } from "../quizzes/quiz.mapper";
+import type { QuizItem } from "../quizzes/quizzes.types";
+import { withQuestions } from "../quizzes/services/quizzes-query.service";
+
+/** A quiz as a student may see it before submitting: no correct answers, accepted answers or explanations. */
+function forStudent(q: QuizItem) {
+  const questions = (q.randomizeQuestions ? shuffled(q.questions) : q.questions).map((x) => ({
+    id: x.id,
+    kind: x.kind,
+    questionHtml: x.questionHtml,
+    options: q.randomizeOptions || x.shuffleOptions ? shuffled(x.options) : x.options,
+    points: x.points,
+    timeLimitSeconds: x.timeLimitSeconds,
+    required: x.required,
+  }));
+  return {
+    id: q.id,
+    title: q.title,
+    descriptionHtml: q.descriptionHtml,
+    instructionsHtml: q.instructionsHtml,
+    courseId: q.courseId,
+    moduleId: q.moduleId,
+    difficulty: q.difficulty,
+    totalMarks: q.questions.reduce((s, x) => s + x.points, 0),
+    passingMarks: q.passingMarks,
+    timeLimitMinutes: q.timeLimitMinutes,
+    maxAttempts: q.maxAttempts,
+    startDate: q.startDate,
+    endDate: q.endDate,
+    questions,
+  };
+}
 
 @Injectable()
 export class QuizService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createQuiz(data: any) {
-    const { questions, ...quizData } = data;
-    const totalMarks =
-      quizData.totalMarks ??
-      (Array.isArray(questions) && questions.length > 0
-        ? questions.reduce((sum: number, q: any) => sum + (Number(q.marks) || 1), 0)
-        : 10);
-
-    const quiz = await this.prisma.quiz.create({
-      data: {
-        courseId: quizData.courseId || "",
-        lessonId: quizData.lessonId || "",
-        title: quizData.title || "Untitled Quiz",
-        description: quizData.description || null,
-        timeLimitMinutes: Number(quizData.timeLimitMinutes) || 15,
-        passingScore: Number(quizData.passingScore) || Math.ceil(totalMarks * 0.7),
-        totalMarks: Number(totalMarks),
-        status: quizData.status || "ACTIVE",
-      },
-    });
-
-    if (Array.isArray(questions) && questions.length > 0) {
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        await this.prisma.quizQuestion.create({
-          data: {
-            quizId: quiz.id,
-            questionText: q.questionText || q.question || "Untitled Question",
-            questionType: q.questionType || "MULTIPLE_CHOICE",
-            options: JSON.stringify(q.options || []),
-            correctAnswer: q.correctAnswer || "",
-            marks: Number(q.marks) || 1,
-            explanation: q.explanation || null,
-            order: q.order ?? i + 1,
-          },
-        });
-      }
-    }
-
-    return this.getQuiz(quiz.id);
+  /** Enrolled students only, unless the quiz is open to all students of the workspace. */
+  private async assertAccess(user: AuthUser, quiz: Pick<QuizWithQuestions, "courseId" | "access" | "institutionId">) {
+    if (user.role === "ADMIN") return;
+    if (quiz.access === "ALL_STUDENTS" && (quiz.institutionId ?? null) === (user.institutionId ?? null)) return;
+    const enrolled = await this.prisma.enrollment.findUnique({ where: { userId_courseId: { userId: user.userId, courseId: quiz.courseId } }, select: { id: true } });
+    if (!enrolled) throw new ForbiddenException("Enroll in this course to take its quizzes.");
   }
 
-  async getQuiz(quizId: string, role?: string) {
-    const quiz = await this.prisma.quiz.findUnique({
-      where: { id: quizId },
-    });
-    if (!quiz) throw new NotFoundException("Quiz not found");
-
-    const rawQuestions = await this.prisma.quizQuestion.findMany({
-      where: { quizId },
-      orderBy: { order: "asc" },
-    });
-
-    const questions = rawQuestions.map((q) => {
-      let parsedOptions: string[] = [];
-      try {
-        parsedOptions = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
-      } catch {
-        parsedOptions = [q.options];
-      }
-      if (role === "STUDENT") {
-        const { correctAnswer, ...rest } = q;
-        return { ...rest, options: parsedOptions };
-      }
-      return { ...q, options: parsedOptions };
-    });
-
-    return { ...quiz, questions };
+  private async mustFindOpen(user: AuthUser, id: string) {
+    const quiz = await this.prisma.quiz.findUnique({ where: { id }, include: withQuestions });
+    if (!quiz || quiz.status !== "PUBLISHED") throw new NotFoundException("Quiz not found");
+    await this.assertAccess(user, quiz);
+    return quiz;
   }
 
-  async getQuizByLesson(lessonId: string, role?: string) {
-    const quiz = await this.prisma.quiz.findFirst({
-      where: { lessonId },
-    });
+  async listForCourse(user: AuthUser, courseId: string) {
+    const now = new Date();
+    const quizzes = await this.prisma.quiz.findMany({ where: { courseId, status: "PUBLISHED" }, include: withQuestions, orderBy: { createdAt: "asc" } });
+    if (quizzes[0]) await this.assertAccess(user, quizzes[0]);
+    return quizzes.filter((q) => !quizClosedReason(q, now)).map((q) => forStudent(toQuizItem(q)));
+  }
+
+  async forLesson(user: AuthUser, lessonId: string) {
+    const quiz = await this.prisma.quiz.findFirst({ where: { lessonId, status: "PUBLISHED" }, include: withQuestions });
     if (!quiz) return null;
-    return this.getQuiz(quiz.id, role);
+    await this.assertAccess(user, quiz);
+    return forStudent(toQuizItem(quiz));
   }
 
-  async getQuizzesByCourse(courseId: string) {
-    return await this.prisma.quiz.findMany({
-      where: { courseId },
-    });
+  async take(user: AuthUser, id: string) {
+    const quiz = await this.mustFindOpen(user, id);
+    const closed = quizClosedReason(quiz);
+    if (closed) throw new BadRequestException(closed);
+    return forStudent(toQuizItem(quiz));
   }
 
-  async getMyAttempts(userId: string, quizId?: string) {
-    return await this.prisma.quizAttempt.findMany({
-      where: {
-        userId,
-        ...(quizId && { quizId }),
-      },
+  myAttempts(user: AuthUser, quizId: string) {
+    return this.prisma.quizAttempt.findMany({
+      where: { quizId, userId: user.userId },
       orderBy: { submittedAt: "desc" },
+      select: { id: true, attemptNumber: true, score: true, totalMarks: true, percentage: true, passed: true, completed: true, timeTakenSeconds: true, submittedAt: true },
     });
   }
 
-  async getQuizAttemptsForTeacher(quizId: string) {
-    const attempts = await this.prisma.quizAttempt.findMany({
-      where: { quizId },
-      orderBy: { submittedAt: "desc" },
-    });
+  async submit(user: AuthUser, quizId: string, dto: SubmitQuizDto) {
+    const quiz = await this.mustFindOpen(user, quizId);
+    const now = new Date();
+    const prior = await this.prisma.quizAttempt.count({ where: { quizId, userId: user.userId } });
+    const problem = quizClosedReason(quiz, now) ?? attemptLimitReason(quiz, prior);
+    if (problem) throw new BadRequestException(problem);
 
-    const userIds = attempts.map((a) => a.userId);
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        avatar: true,
-      },
-    });
-    const userMap = new Map(users.map((u) => [u.id, u]));
+    const item = toQuizItem(quiz);
+    const missing = missingRequired(item.questions, dto.answers);
+    if (missing) throw new BadRequestException(`Answer all required questions (${missing} left).`);
 
-    return attempts.map((attempt) => ({
-      ...attempt,
-      user: userMap.get(attempt.userId) || null,
-    }));
-  }
-
-  async updateQuiz(id: string, data: any) {
-    const { questions, ...quizData } = data;
-    const existing = await this.prisma.quiz.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Quiz not found");
-
-    let totalMarks = quizData.totalMarks;
-    if (Array.isArray(questions)) {
-      totalMarks = questions.reduce((sum: number, q: any) => sum + (Number(q.marks) || 1), 0);
-    }
-
-    await this.prisma.quiz.update({
-      where: { id },
-      data: {
-        ...(quizData.title !== undefined ? { title: quizData.title } : {}),
-        ...(quizData.description !== undefined ? { description: quizData.description } : {}),
-        ...(quizData.timeLimitMinutes !== undefined ? { timeLimitMinutes: Number(quizData.timeLimitMinutes) } : {}),
-        ...(quizData.passingScore !== undefined ? { passingScore: Number(quizData.passingScore) } : {}),
-        ...(quizData.status !== undefined ? { status: quizData.status } : {}),
-        ...(totalMarks !== undefined ? { totalMarks: Number(totalMarks) } : {}),
-      },
-    });
-
-    if (Array.isArray(questions)) {
-      await this.prisma.quizQuestion.deleteMany({ where: { quizId: id } });
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        await this.prisma.quizQuestion.create({
-          data: {
-            quizId: id,
-            questionText: q.questionText || q.question || "Untitled Question",
-            questionType: q.questionType || "MULTIPLE_CHOICE",
-            options: JSON.stringify(q.options || []),
-            correctAnswer: q.correctAnswer || "",
-            marks: Number(q.marks) || 1,
-            explanation: q.explanation || null,
-            order: q.order ?? i + 1,
-          },
-        });
-      }
-    }
-
-    return this.getQuiz(id);
-  }
-
-  async deleteQuiz(id: string) {
-    await this.prisma.quizQuestion.deleteMany({ where: { quizId: id } });
-    return await this.prisma.quiz.delete({ where: { id } });
-  }
-
-  async submitQuiz(userId: string, quizId: string, userAnswers: any[]) {
-    const quiz = await this.prisma.quiz.findUnique({ where: { id: quizId } });
-    if (!quiz) throw new NotFoundException("Quiz not found");
-
-    const questions = await this.prisma.quizQuestion.findMany({
-      where: { quizId },
-    });
-    let score = 0;
-    let totalMarks = 0;
-
-    questions.forEach((q) => {
-      totalMarks += q.marks;
-      const userAnswer = userAnswers.find((ans) => ans.questionId === q.id);
-      if (userAnswer && userAnswer.answer === q.correctAnswer) {
-        score += q.marks;
-      }
-    });
-
-    const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
-
-    return await this.prisma.quizAttempt.create({
+    const graded = gradeAttempt(item.questions, dto.answers, item.passingMarks);
+    const timeTakenSeconds = Math.round(dto.timeTakenSeconds ?? graded.results.reduce((s, r) => s + r.timeSeconds, 0));
+    const attempt = await this.prisma.quizAttempt.create({
       data: {
         quizId,
-        userId,
-        answers: JSON.stringify(userAnswers),
-        score,
-        percentage: Number(percentage.toFixed(2)),
+        userId: user.userId,
+        answers: JSON.stringify(dto.answers),
+        results: graded.results as any,
+        score: graded.score,
+        totalMarks: graded.totalMarks,
+        percentage: graded.percentage,
+        passed: graded.passed,
         parsed: true,
-        submittedAt: new Date(),
+        completed: true,
+        attemptNumber: prior + 1,
+        timeTakenSeconds,
+        startedAt: new Date(now.getTime() - timeTakenSeconds * 1000),
+        submittedAt: now,
       },
     });
+
+    const reveal = item.showImmediately;
+    return {
+      id: attempt.id,
+      attemptNumber: attempt.attemptNumber,
+      // Without "show results immediately" the student only learns that it was submitted.
+      ...(reveal && {
+        score: graded.score,
+        totalMarks: graded.totalMarks,
+        percentage: graded.percentage,
+        passed: graded.passed,
+        questions: item.questions.map((q) => ({
+          questionId: q.id,
+          correct: graded.results.find((r) => r.questionId === q.id)?.correct ?? false,
+          ...(item.showCorrectAnswers && { correctOptionIds: q.correctOptionIds, acceptedAnswers: q.acceptedAnswers }),
+          ...(item.showExplanation && { explanationHtml: q.explanationHtml }),
+        })),
+      }),
+    };
   }
 }

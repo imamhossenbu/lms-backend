@@ -1,4 +1,4 @@
-import { localToInstant } from "./assignment-schedule";
+import { localToInstant } from "../common/workspace-time";
 import type { AssignmentFields, AssignmentRubric } from "./assignments.types";
 
 /**

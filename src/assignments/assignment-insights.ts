@@ -1,4 +1,4 @@
-import { instantToLocal, startOfLocalDay } from "./assignment-schedule";
+import { instantToLocal, startOfLocalDay } from "../common/workspace-time";
 import type { AssignmentItem, AssignmentRubric, AssignmentSubmission, CourseAssignmentStats, SubmissionCounts } from "./assignments.types";
 
 /**

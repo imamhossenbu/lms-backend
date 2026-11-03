@@ -1,82 +1,44 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-  Req,
-} from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from "@nestjs/common";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
+import { SubmitQuizDto } from "../quizzes/dto/attempt.dto";
 import { QuizService } from "./quiz.service";
-import { AuthGuard } from "@nestjs/passport";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { RolesGuard } from "../auth/guards/roles.guard";
 
+const Id = (name: string) => Param(name, new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
+
+/** Student side of quizzes: list open quizzes, take one (no answers leaked), submit, see own attempts. */
+@ApiTags("Quizzes (student)")
 @Controller("quiz")
+@RequireRoles("STUDENT", "ADMIN")
+@ValidateDto()
 export class QuizController {
-  constructor(private readonly quizService: QuizService) {}
+  constructor(private readonly service: QuizService) {}
 
-  @Post()
-  @UseGuards(AuthGuard("jwt"), RolesGuard)
-  @Roles("ADMIN", "TEACHER")
-  async create(@Body() body: any) {
-    return this.quizService.createQuiz(body);
+  @Get("course/:courseId")
+  @ApiOperation({ summary: "Open, published quizzes of a course" })
+  byCourse(@CurrentUser() user: AuthUser, @Id("courseId") courseId: string) {
+    return this.service.listForCourse(user, courseId);
   }
 
   @Get("lesson/:lessonId")
-  @UseGuards(AuthGuard("jwt"))
-  async getByLesson(@Req() req: any, @Param("lessonId") lessonId: string) {
-    return this.quizService.getQuizByLesson(lessonId, req.user?.role);
-  }
-
-  @Get("course/:courseId")
-  @UseGuards(AuthGuard("jwt"))
-  async getByCourse(@Param("courseId") courseId: string) {
-    return this.quizService.getQuizzesByCourse(courseId);
+  byLesson(@CurrentUser() user: AuthUser, @Id("lessonId") lessonId: string) {
+    return this.service.forLesson(user, lessonId);
   }
 
   @Get(":quizId")
-  @UseGuards(AuthGuard("jwt"))
-  async getQuiz(@Req() req: any, @Param("quizId") quizId: string) {
-    return this.quizService.getQuiz(quizId, req.user?.role);
-  }
-
-  @Patch(":quizId")
-  @UseGuards(AuthGuard("jwt"), RolesGuard)
-  @Roles("ADMIN", "TEACHER")
-  async update(@Param("quizId") quizId: string, @Body() body: any) {
-    return this.quizService.updateQuiz(quizId, body);
+  @ApiOperation({ summary: "Quiz to take: questions without answers, shuffled when the quiz says so" })
+  take(@CurrentUser() user: AuthUser, @Id("quizId") quizId: string) {
+    return this.service.take(user, quizId);
   }
 
   @Get(":quizId/my-attempts")
-  @UseGuards(AuthGuard("jwt"))
-  async getMyAttempts(@Req() req: any, @Param("quizId") quizId: string) {
-    return this.quizService.getMyAttempts(req.user.userId, quizId);
-  }
-
-  @Get(":quizId/submissions")
-  @UseGuards(AuthGuard("jwt"), RolesGuard)
-  @Roles("ADMIN", "TEACHER")
-  async getSubmissions(@Param("quizId") quizId: string) {
-    return this.quizService.getQuizAttemptsForTeacher(quizId);
+  myAttempts(@CurrentUser() user: AuthUser, @Id("quizId") quizId: string) {
+    return this.service.myAttempts(user, quizId);
   }
 
   @Post(":quizId/submit")
-  @UseGuards(AuthGuard("jwt"))
-  async submit(
-    @Req() req: any,
-    @Param("quizId") quizId: string,
-    @Body("answers") answers: any[],
-  ) {
-    return this.quizService.submitQuiz(req.user.userId, quizId, answers);
-  }
-
-  @Delete(":quizId")
-  @UseGuards(AuthGuard("jwt"), RolesGuard)
-  @Roles("ADMIN", "TEACHER")
-  async delete(@Param("quizId") quizId: string) {
-    return this.quizService.deleteQuiz(quizId);
+  @ApiOperation({ summary: "Submit answers; graded on the server" })
+  submit(@CurrentUser() user: AuthUser, @Id("quizId") quizId: string, @Body() dto: SubmitQuizDto) {
+    return this.service.submit(user, quizId, dto);
   }
 }

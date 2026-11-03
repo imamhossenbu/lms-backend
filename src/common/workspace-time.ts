@@ -1,6 +1,11 @@
-import { WORKSPACE_UTC_OFFSET_MINUTES } from "./assignments.constants";
-
-/** Workspace-local "YYYY-MM-DD" + "HH:mm" ⇄ UTC instants. Pure; the offset is a parameter for tests. */
+/**
+ * Workspace-local "YYYY-MM-DD" + "HH:mm" ⇄ UTC instants. Pure; the offset is a parameter for tests.
+ *
+ * The panel sends local dates. Until workspace Settings carry a timezone, they are read in Bangladesh
+ * time — the platform's market (prices are in BDT).
+ */
+export const WORKSPACE_UTC_OFFSET_MINUTES = 6 * 60;
+export const WORKSPACE_TIME_ZONE = "Asia/Dhaka";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 

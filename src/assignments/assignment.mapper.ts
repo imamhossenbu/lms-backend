@@ -1,6 +1,6 @@
 import type { Assignment, AssignmentSubmission as SubmissionRow, Prisma } from "../../generated/prisma";
 import { sanitizeRichText } from "../common/html";
-import { instantToLocal, localToInstant } from "./assignment-schedule";
+import { instantToLocal, localToInstant } from "../common/workspace-time";
 import type {
   AssignmentAttachment,
   AssignmentFields,

@@ -130,6 +130,7 @@ model CourseModule {
 
   lessons     Lesson[]
   assignments Assignment[]
+  quizzes     Quiz[]
 }
 
 model Lesson {
@@ -196,50 +197,133 @@ model LessonProgress {
   @@index([userId, courseId])
 }
 
+/// Course quiz. First-version columns keep their names: description (descriptionHtml), passingScore (passing marks),
+/// totalMarks (= sum of question points, maintained by the API).
 model Quiz {
-  id               String  @id @default(uuid())
-  courseId         String
-  course           Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessonId         String
-  title            String
-  description      String?
-  timeLimitMinutes Int
-  passingScore     Int
-  totalMarks       Int
-  status           String
+  id                     String        @id @default(uuid())
+  /// SaaS tenant. null = legacy single-tenant data.
+  institutionId          String?
+  courseId               String
+  course                 Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  moduleId               String?
+  module                 CourseModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  lessonId               String        @default("")
+  title                  String
+  description            String?
+  instructionsHtml       String        @default("")
+  /// "BEGINNER" | "INTERMEDIATE" | "ADVANCED".
+  difficulty             String        @default("BEGINNER")
+  /// null = no time limit.
+  timeLimitMinutes       Int?
+  passingScore           Int
+  totalMarks             Int
+  /// "PUBLISHED" | "DRAFT" | "ARCHIVED".
+  status                 String
+  /// null = unlimited attempts.
+  maxAttempts            Int?
+  showCorrectAnswers     Boolean       @default(true)
+  showExplanation        Boolean       @default(true)
+  randomizeQuestions     Boolean       @default(false)
+  randomizeOptions       Boolean       @default(false)
+  /// Open from the start of this workspace-local day (null = immediately).
+  startsAt               DateTime?
+  /// Open until the end of this workspace-local day (null = no end).
+  endsAt                 DateTime?
+  /// "ENROLLED" | "ALL_STUDENTS" | "SPECIFIC_GROUPS".
+  access                 String        @default("ENROLLED")
+  requirePreviousLessons Boolean       @default(false)
+  /// Show the result right after submitting.
+  showImmediately        Boolean       @default(false)
+  createdById            String?
+  createdByName          String        @default("")
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @default(now()) @updatedAt
 
-  attempts QuizAttempt[]
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+  events    QuizEvent[]
 
   @@index([courseId])
+  @@index([institutionId])
 }
 
+/// questionText = questionHtml, questionType = kind, marks = points, explanation = explanationHtml.
+/// options: JSON [{ id, text }] (legacy rows: JSON string[]); correctAnswer: text of the first correct option (legacy grading).
 model QuizQuestion {
-  id            String  @id @default(uuid())
-  quizId        String
-  questionText  String
-  questionType  String
-  options       String
-  correctAnswer String
-  marks         Int
-  explanation   String?
-  order         Int
+  id               String  @id @default(uuid())
+  quizId           String
+  quiz             Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionText     String
+  questionType     String
+  options          String
+  correctAnswer    String
+  /// Option ids that are correct.
+  correctOptionIds Json    @default("[]")
+  /// SHORT_ANSWER: accepted answers (case-insensitive).
+  acceptedAnswers  Json    @default("[]")
+  marks            Int
+  explanation      String?
+  order            Int
+  /// null = no per-question limit.
+  timeLimitSeconds Int?
+  required         Boolean @default(true)
+  shuffleOptions   Boolean @default(false)
+
+  @@index([quizId])
 }
 
 model QuizAttempt {
-  id          String   @id @default(uuid())
-  quizId      String
-  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  answers     String // JSON string
-  score       Int
-  percentage  Decimal
-  parsed      Boolean
-  startedAt   DateTime @default(now())
-  submittedAt DateTime
+  id               String   @id @default(uuid())
+  quizId           String
+  quiz             Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// What the student sent: JSON [{ questionId, optionIds?, text?, timeSeconds? }] (legacy: [{ questionId, answer }]).
+  answers          String
+  score            Int
+  percentage       Decimal
+  parsed           Boolean
+  /// 1-based attempt number for this student.
+  attemptNumber    Int      @default(1)
+  /// Total marks at the time of the attempt (0 on legacy rows = use the quiz's).
+  totalMarks       Int      @default(0)
+  passed           Boolean  @default(false)
+  /// false = started but not finished.
+  completed        Boolean  @default(true)
+  timeTakenSeconds Int      @default(0)
+  /// Graded answers: [{ questionId, correct, timeSeconds }].
+  results          Json     @default("[]")
+  startedAt        DateTime @default(now())
+  submittedAt      DateTime
 
   @@index([userId])
   @@index([quizId])
+}
+
+enum QuizEventKind {
+  CREATED
+  UPDATED
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+  QUESTION_ADDED
+  QUESTION_REMOVED
+  SETTINGS_CHANGED
+  DUPLICATED
+}
+
+/// Quiz › Activity Log tab.
+model QuizEvent {
+  id        String        @id @default(uuid())
+  quizId    String
+  quiz      Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  kind      QuizEventKind
+  message   String
+  actorId   String?
+  actorName String
+  createdAt DateTime      @default(now())
+
+  @@index([quizId, createdAt])
 }
 
 enum AssignmentType {

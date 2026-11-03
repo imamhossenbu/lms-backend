@@ -17,11 +17,9 @@ import {
   MaxLength,
   Min,
   MinLength,
-  ValidateBy,
   ValidateNested,
-  type ValidationOptions,
 } from "class-validator";
-import { plainTextLength } from "../../common/html";
+import { PlainTextLength } from "../../common/validators";
 import { PaginationQueryDto } from "../../common/pagination";
 import {
   ASSIGNMENT_STATUSES,
@@ -55,20 +53,6 @@ const OPTIONAL_DATE_RE = /^$|^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const OPTIONAL_TIME_RE = /^$|^([01]\d|2[0-3]):[0-5]\d$/;
 const CLIENT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-
-/** Visible-text length of rich-text HTML must be within [min, max]. */
-function PlainTextLength(min: number, max: number, tooShort: string, tooLong: string, options?: ValidationOptions) {
-  return ValidateBy(
-    {
-      name: "plainTextLength",
-      validator: {
-        validate: (v: unknown) => typeof v === "string" && plainTextLength(v) >= min && plainTextLength(v) <= max,
-        defaultMessage: (args) => (typeof args?.value === "string" && plainTextLength(args.value) > max ? tooLong : tooShort),
-      },
-    },
-    options,
-  );
-}
 
 // ---------------------------------------------------------------- nested parts
 

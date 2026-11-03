@@ -29,11 +29,4 @@ export const LIMITS = {
   maxAttempts: 10,
 } as const;
 
-/**
- * The panel sends local dates ("YYYY-MM-DD" + "HH:mm"). Until workspace Settings carry a timezone, they are read
- * in Bangladesh time — the platform's market (prices are in BDT).
- */
-export const WORKSPACE_UTC_OFFSET_MINUTES = 6 * 60;
-export const WORKSPACE_TIME_ZONE = "Asia/Dhaka";
-
 export const DRAFT_COPY_SUFFIX = " (Copy)";

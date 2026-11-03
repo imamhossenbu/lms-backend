@@ -4,7 +4,7 @@ import type { AuthUser } from "../../common/auth-user";
 import { PrismaService } from "../../prisma/prisma.service";
 import { gradeErrors } from "../assignment-rules";
 import { rubricOf, toSubmission } from "../assignment.mapper";
-import { WORKSPACE_TIME_ZONE } from "../assignments.constants";
+import { WORKSPACE_TIME_ZONE } from "../../common/workspace-time";
 import type { AssignmentSubmission } from "../assignments.types";
 import type { GradeSubmissionDto } from "../dto/submission.dto";
 import { AssignmentsQueryService, submissionInclude } from "./assignments-query.service";
