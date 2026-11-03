@@ -498,6 +498,8 @@ model CourseReview {
   @@index([userId])
 }
 
+/// Issued certificate. First-version columns keep their names: verificationCode is the panel's public `code`
+/// (new rows store the same "EDU-HTML-2026-00042" in certificateNumber), certificateUrl is "" for rows rendered client-side.
 model Certificate {
   id                String   @id @default(uuid())
   userId            String
@@ -509,8 +511,115 @@ model Certificate {
   verificationCode  String   @unique
   issuedAt          DateTime @default(now())
 
+  /// SaaS tenant. null = legacy single-tenant data.
+  institutionId String?
+  /// Template it was rendered with (null on legacy rows or when the template was removed).
+  templateId    String?
+  template      CertificateTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  /// Final grade % when the template shows grades.
+  grade         Int?
+  /// Course completion moment (null on legacy rows = issuedAt).
+  completedAt   DateTime?
+  /// null = never expires.
+  expiresAt     DateTime?
+  method        CertificateIssueMethod @default(AUTO)
+  /// Stored status; EXPIRED is derived from expiresAt.
+  status        CertificateStatus      @default(VALID)
+  revokedReason String                 @default("")
+  revokedAt     DateTime?
+  downloads     Int                    @default(0)
+  verifications Int                    @default(0)
+  emailedAt     DateTime?
+  events        CertificateEvent[]
+
   @@index([certificateNumber])
   @@index([verificationCode])
+  @@index([institutionId, issuedAt])
+  @@index([courseId, userId])
+}
+
+enum CertificateIssueMethod {
+  AUTO
+  MANUAL
+}
+
+enum CertificateStatus {
+  VALID
+  REVOKED
+}
+
+enum CertificateLayout {
+  CLASSIC
+  MODERN
+  MINIMAL
+}
+
+enum CertificateOrientation {
+  LANDSCAPE
+  PORTRAIT
+}
+
+enum CertificateTemplateStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+/// Admin panel › Certificates › Templates (designer + issue rules).
+model CertificateTemplate {
+  id                 String                    @id @default(uuid())
+  /// SaaS tenant. null = legacy single-tenant data.
+  institutionId      String?
+  name               String
+  layout             CertificateLayout         @default(CLASSIC)
+  orientation        CertificateOrientation    @default(LANDSCAPE)
+  /// "orange" | "blue" | "green" | "purple" | "navy".
+  accent             String                    @default("orange")
+  heading            String
+  /// Plain text with {placeholders}.
+  bodyText           String
+  showLogo           Boolean                   @default(true)
+  showQr             Boolean                   @default(true)
+  showGrade          Boolean                   @default(false)
+  /// [{ id, name, title, signatureUrl }]
+  signers            Json                      @default("[]")
+  /// Courses using this template (a course is in at most one ACTIVE template per workspace).
+  courseIds          String[]                  @default([])
+  autoIssue          Boolean                   @default(false)
+  minCompletion      Int                       @default(100)
+  minQuizScore       Int?
+  requireAssignments Boolean                   @default(false)
+  validityMonths     Int?
+  status             CertificateTemplateStatus @default(DRAFT)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  certificates       Certificate[]
+
+  @@index([institutionId, status])
+}
+
+enum CertificateEventKind {
+  ISSUED
+  EMAILED
+  DOWNLOADED
+  VERIFIED
+  REVOKED
+  RESTORED
+  REISSUED
+}
+
+/// Certificate › Activity card.
+model CertificateEvent {
+  id            String               @id @default(uuid())
+  certificateId String
+  certificate   Certificate          @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  kind          CertificateEventKind
+  message       String
+  actorId       String?
+  actorName     String
+  createdAt     DateTime             @default(now())
+
+  @@index([certificateId, createdAt])
 }
 
 // --- AI Engine ---
