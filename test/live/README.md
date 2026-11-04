@@ -1,0 +1,32 @@
+# Live API suites
+
+End-to-end checks that run against a **real server and database**. Each suite creates its own isolated
+workspace (institution, users, data) and deletes everything in `finally`, so it's safe to run against the
+dev database. These are not Jest tests and are not part of `npm test`.
+
+| Suite | What it covers |
+| --- | --- |
+| `crud-all-domains.live.ts` | Create → read → list → update → delete across every admin domain, plus student flows, coupons and auth |
+| `tenancy.live.ts` | Workspace isolation for catalogue, students, orders and nested course routes |
+| `security.live.ts` | Validation, CORS allowlist, helmet headers, auth edge cases |
+| `plan-limits.live.ts` | Plan features, usage limits and inactive workspaces (403 codes) |
+| `endpoint-sweep.live.ts` | Calls every Swagger route as anonymous / admin / student and flags any 5xx |
+| `panel-auth.e2e.live.ts` | Browser test of the admin panel: 2FA login, permission-aware sidebar, accept-invite, required 2FA |
+
+## Running
+
+```bash
+# 1. API on :4077 (Swagger must be on for the endpoint sweep)
+PORT=4077 CORS_ORIGINS=http://localhost:3010 npm run dev
+
+# 2. Any API suite
+npx ts-node --transpile-only test/live/crud-all-domains.live.ts
+
+# Browser suite: admin panel on :3010 pointing at the API, plus puppeteer-core
+(cd ../lms-admin-panel && NEXT_PUBLIC_API_URL=http://localhost:4077 npx next dev -p 3010)
+npm i --no-save puppeteer-core
+npx ts-node --transpile-only test/live/panel-auth.e2e.live.ts
+```
+
+Environment overrides: `LIVE_API_URL`, `LIVE_PANEL_URL`, `LIVE_SHOTS_DIR` (screenshots), `CHROME_PATH`.
+Neon sometimes drops a connection under load ("timeout exceeded when trying to connect"); rerun if so.
