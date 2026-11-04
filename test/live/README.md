@@ -15,6 +15,7 @@ dev database. These are not Jest tests and are not part of `npm test`.
 | `panel-students.e2e.live.ts` | Browser test of the panel Students pages: list search / filters / URL state, create with enrollment, inline edit, notes, enroll / unenroll, workspace isolation, delete |
 | `panel-instructors.e2e.live.ts` | Browser test of the panel Instructors pages: list filters / URL state, create with course, tabs, notes, message, edit (locked courses), delete (409 while teaching), isolation |
 | `panel-team.e2e.live.ts` | Browser test of the panel Team & Roles pages: members from the API, invite, revoke, change role, suspend / reactivate, create role, self-guard |
+| `panel-billing.e2e.live.ts` | Browser test of the panel Billing & Plan + custom domain + public signup: payment method, domain add/remove, pay invoice (paid + declined), downgrade, cancel/reactivate, signup → PENDING admin |
 | `owner-console.e2e.live.ts` | Browser test of the Owner Console: owner sign-in, snapshot pages, create institution, coupons, settings, alerts read-state, "Open as owner" into the panel, expired session |
 
 ## Running
