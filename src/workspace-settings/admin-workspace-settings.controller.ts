@@ -1,4 +1,5 @@
-import { Body, Controller, createParamDecorator, ExecutionContext, Get, HttpCode, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, createParamDecorator, ExecutionContext, Get, HttpCode, Param, Patch, Post, Req } from "@nestjs/common";
+import type { Request } from "express";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { RequireRoles, ValidateDto } from "../common/auth-user";
 import { AllowPendingTwoFactor, RequirePermission } from "../team/permissions.guard";
@@ -37,6 +38,13 @@ export class AdminWorkspaceSettingsController {
   @ApiOperation({ summary: "All sections (defaults when never saved), masked secret hints, audit and per-section last-saved times" })
   get(@Actor() ctx: ActorContext) {
     return this.settings.store(ctx.tenantId);
+  }
+
+  @Get("client-ip")
+  @RequirePermission("settings", "view")
+  @ApiOperation({ summary: "The caller's IP as the API sees it (Security › IP allowlist lock-out warning)" })
+  clientIp(@Req() req: Request) {
+    return { ip: (req.ip ?? "").replace(/^::ffff:/, "") };
   }
 
   @Patch("general")
@@ -103,6 +111,14 @@ export class AdminWorkspaceSettingsController {
   @RequirePermission("settings", "manage")
   testIntegration(@Actor() ctx: ActorContext, @Param("key") key: string) {
     return this.settings.testIntegration(ctx, key);
+  }
+
+  @Post("payments/:gateway/test")
+  @HttpCode(200)
+  @RequirePermission("settings", "manage")
+  @ApiOperation({ summary: "Checks a gateway's saved setup (enabled, public key, stored secret); `missing` lists what's absent" })
+  testGateway(@Actor() ctx: ActorContext, @Param("gateway") gateway: string) {
+    return this.settings.testGateway(ctx, gateway);
   }
 
   @Post("email/test")

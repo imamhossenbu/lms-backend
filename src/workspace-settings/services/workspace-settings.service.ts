@@ -8,7 +8,7 @@ import type { ActorContext } from "../../team/services/team-access.service";
 import { AUDIT_MAX } from "../workspace-settings.constants";
 import { scopeKeyOf, storedSecrets, toStore } from "../workspace-settings.mapper";
 import { auditSummary, changedKeys, extractSecrets, humanize, isSecretPath, mergeSection, settingsRuleErrors } from "../workspace-settings.rules";
-import { INTEGRATION_KEYS, type IntegrationKey, type PlatformSettings, type SettingsAuditEntry, type SettingsSection, type SettingsStore } from "../workspace-settings.types";
+import { GATEWAY_KEYS, INTEGRATION_KEYS, type GatewayKey, type IntegrationKey, type PlatformSettings, type SettingsAuditEntry, type SettingsSection, type SettingsStore } from "../workspace-settings.types";
 import { WorkspaceSettingsReader } from "./workspace-settings-reader.service";
 import { PlanAccessService } from "../../plan-access/plan-access.service";
 
@@ -85,6 +85,26 @@ export class WorkspaceSettingsService {
     const i = integrations[key as IntegrationKey];
     const ok = i.connected && (!!i.accountLabel || !!storedSecrets(secrets)[`integrations.${key}.apiKey`]);
     return { ok, latencyMs: Date.now() - started };
+  }
+
+  /**
+   * Settings › Payments › Test connection: checks the saved gateway config (enabled, public key and a stored
+   * secret key). The gateways themselves aren't called yet, so this confirms setup, not live credentials.
+   */
+  async testGateway(ctx: ActorContext, key: string): Promise<{ ok: boolean; latencyMs: number; missing: string[] }> {
+    if (!(GATEWAY_KEYS as readonly string[]).includes(key)) throw new NotFoundException("This payment gateway doesn't exist.");
+    const started = Date.now();
+    const [payments, secrets] = await Promise.all([
+      this.reader.section(ctx.tenantId, "payments"),
+      this.prisma.workspaceSettings.findUnique({ where: { scopeKey: scopeKeyOf(ctx.tenantId) }, select: { secrets: true } }),
+    ]);
+    const g = payments[key as GatewayKey];
+    const missing = [
+      ...(g.enabled ? [] : ["enabled"]),
+      ...(g.publicKey?.trim() ? [] : ["publicKey"]),
+      ...(storedSecrets(secrets)[`payments.${key}.secretKey`] ? [] : ["secretKey"]),
+    ];
+    return { ok: missing.length === 0, latencyMs: Date.now() - started, missing };
   }
 
   /** Settings › Email › Send test email (sent through the platform mailer). */

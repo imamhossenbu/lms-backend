@@ -17,7 +17,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { LessonResourceService } from "./lesson-resource.service";
-import { CreateLessonResourceDto } from "./dto/resource.dto";
+import { CreateLessonResourceDto, UpdateLessonResourceDto } from "./dto/resource.dto";
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -38,10 +38,11 @@ export class LessonResourceController {
     @Body() dto: CreateLessonResourceDto,
     @UploadedFile(
       new ParseFilePipe({
+        fileIsRequired: false,
         validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 50 })],
       }),
     )
-    file: Express.Multer.File,
+    file: Express.Multer.File | undefined,
   ) {
     return this.resourceService.create(lessonId, dto, file);
   }
@@ -56,7 +57,7 @@ export class LessonResourceController {
   @UseInterceptors(FileInterceptor("file"))
   async update(
     @Param("id") id: string,
-    @Body() dto: Partial<CreateLessonResourceDto>,
+    @Body() dto: UpdateLessonResourceDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.resourceService.update(id, dto, file);

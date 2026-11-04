@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
-import { CreateLessonResourceDto } from "./dto/resource.dto";
+import { CreateLessonResourceDto, UpdateLessonResourceDto } from "./dto/resource.dto";
 
 @Injectable()
 export class LessonResourceService {
@@ -17,9 +17,22 @@ export class LessonResourceService {
   async create(
     lessonId: string,
     dto: CreateLessonResourceDto,
-    file: Express.Multer.File,
+    file?: Express.Multer.File,
   ) {
-    if (!file) throw new BadRequestException("File is required");
+    if (!file) {
+      // Already hosted file (POST /courses/upload-media) or an external link.
+      if (!dto.fileUrl) throw new BadRequestException("Upload a file or send a fileUrl.");
+      return await this.prisma.lessonResource.create({
+        data: {
+          title: dto.title,
+          fileUrl: dto.fileUrl,
+          fileType: dto.fileType || "FILE",
+          size: dto.size || "",
+          lessonId,
+          isDownloadable: dto.isDownloadable !== false,
+        },
+      });
+    }
 
     // Cloudinary upload
     const uploadResult = await this.cloudinary.uploadFile(file);
@@ -55,7 +68,7 @@ export class LessonResourceService {
 
   async update(
     id: string,
-    dto: Partial<CreateLessonResourceDto>,
+    dto: UpdateLessonResourceDto,
     file?: Express.Multer.File,
   ) {
     const existing = await this.prisma.lessonResource.findUnique({

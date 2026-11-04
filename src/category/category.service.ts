@@ -19,24 +19,31 @@ export class CategoryService {
       iconUrl = await this.cloudinary.uploadImage(file);
     }
     return await this.prisma.category.create({
-      data: { ...dto, icon: iconUrl, status: "ACTIVE", institutionId: tenantId },
+      data: { ...dto, icon: iconUrl, status: dto.status ?? "ACTIVE", institutionId: tenantId },
     });
   }
 
+  /** Each category with `_count.courses` and `publishedCourses` (courses with status PUBLISHED). */
   async findAll(tenantId: string | null) {
-    return await this.prisma.category.findMany({
-      where: { institutionId: tenantId },
-      include: {
-        _count: {
-          select: { courses: true },
+    const [rows, published] = await Promise.all([
+      this.prisma.category.findMany({
+        where: { institutionId: tenantId },
+        include: {
+          _count: {
+            select: { courses: true },
+          },
         },
-      },
-      orderBy: { name: "asc" },
-    });
+        orderBy: { name: "asc" },
+      }),
+      this.prisma.course.groupBy({ by: ["categoryId"], where: { institutionId: tenantId, status: "PUBLISHED" }, _count: { _all: true } }),
+    ]);
+    const byCategory = new Map(published.map((p) => [p.categoryId, p._count._all]));
+    return rows.map((c) => ({ ...c, publishedCourses: byCategory.get(c.id) ?? 0 }));
   }
 
   async update(tenantId: string | null, id: string, dto: UpdateCategoryDto, file?: Express.Multer.File) {
     await findCategoryInTenant(this.prisma, tenantId, id);
+    if (dto.slug) await assertSlugFree(this.prisma, "category", tenantId, dto.slug, id);
     let iconUrl: string | undefined = undefined;
     if (file) {
       iconUrl = await this.cloudinary.uploadImage(file);
