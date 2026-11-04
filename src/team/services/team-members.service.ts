@@ -129,7 +129,7 @@ export class TeamMembersService {
       where: { id: { in: memberIds }, institutionId: ctx.tenantId, status: "ACTIVE", user: { twoFactorEnabled: false } },
       include: { user: { select: { name: true, email: true } } },
     });
-    const link = `${this.config.get<string>("FRONTEND_URL") || "http://localhost:3000"}/settings?tab=security`;
+    const link = `${this.config.get<string>("FRONTEND_URL") || "http://localhost:3000"}/settings?section=security`;
     let reminded = 0;
     for (const m of members) {
       try {
