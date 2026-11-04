@@ -20,6 +20,8 @@ dev database. These are not Jest tests and are not part of `npm test`.
 | `panel-analytics.e2e.live.ts` | Browser test of the panel Dashboard + Analytics: KPIs / recent orders from the API (৳), overview + revenue tabs, period in the URL, Starter plan gate (no gated request) |
 | `panel-assignments.e2e.live.ts` | Browser test of the panel Assignments: list from the API, create wizard on a real course (modules from the API, rubric template), grading with rubric levels, duplicate, isolation |
 | `panel-quizzes.e2e.live.ts` | Browser test of the panel Quizzes: list from the API, create wizard on a real course / module (True-or-False question), publish, attempt counts, details, duplicate, isolation |
+| `panel-certificates.e2e.live.ts` | Browser test of the panel Certificates: list from the API, template designer on a real course, eligible queue + Issue to all, manual issue (learner picker from the API), revoke / restore, verify, isolation |
+| `panel-community.e2e.live.ts` | Browser test of the panel Community: list + moderation queue from the API, New Discussion on a real course / module, view count, reply as the admin, accept answer, pin, resolve report, delete, isolation |
 | `owner-console.e2e.live.ts` | Browser test of the Owner Console: owner sign-in, snapshot pages, create institution, coupons, settings, alerts read-state, "Open as owner" into the panel, expired session |
 
 ## Running
