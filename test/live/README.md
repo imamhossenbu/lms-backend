@@ -18,6 +18,7 @@ dev database. These are not Jest tests and are not part of `npm test`.
 | `panel-billing.e2e.live.ts` | Browser test of the panel Billing & Plan + custom domain + public signup: payment method, domain add/remove, pay invoice (paid + declined), downgrade, cancel/reactivate, signup → PENDING admin |
 | `panel-orders.e2e.live.ts` | Browser test of the panel Orders + Payments: manual order, mark as paid (enrollment), note, refund (access revoked), paid order, server filters + stats, isolation |
 | `panel-analytics.e2e.live.ts` | Browser test of the panel Dashboard + Analytics: KPIs / recent orders from the API (৳), overview + revenue tabs, period in the URL, Starter plan gate (no gated request) |
+| `panel-assignments.e2e.live.ts` | Browser test of the panel Assignments: list from the API, create wizard on a real course (modules from the API, rubric template), grading with rubric levels, duplicate, isolation |
 | `owner-console.e2e.live.ts` | Browser test of the Owner Console: owner sign-in, snapshot pages, create institution, coupons, settings, alerts read-state, "Open as owner" into the panel, expired session |
 
 ## Running
