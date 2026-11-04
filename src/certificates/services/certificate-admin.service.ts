@@ -11,6 +11,7 @@ import { validNow } from "./certificate-eligibility.service";
 import { CertificateEventsService } from "./certificate-events.service";
 import { CertificateIssuerService, type IssueActor } from "./certificate-issuer.service";
 import { CertificatesQueryService } from "./certificates-query.service";
+import { findCourseInTenant, tenantOf } from "../../common/tenancy";
 
 type Actor = AuthUser & IssueActor;
 
@@ -30,8 +31,7 @@ export class CertificateAdminService {
   async issue(user: AuthUser, dto: IssueCertificateDto): Promise<IssuedCertificate> {
     const actor = await this.actor(user);
     const institutionId = actor.institutionId ?? null;
-    const course = await this.prisma.course.findUnique({ where: { id: dto.courseId }, select: { id: true, title: true } });
-    if (!course) throw new NotFoundException("This course no longer exists.");
+    const course = await findCourseInTenant(this.prisma, tenantOf(user), dto.courseId, { id: true, title: true });
     const template = await this.issuer.activeTemplate(institutionId, course.id);
     if (!template) throw new BadRequestException("This course has no active certificate template. Assign one first.");
     const learner = await this.prisma.user.findFirst({ where: { id: dto.recipientId, institutionId, deletedAt: null }, select: { id: true, name: true, email: true } });
@@ -61,7 +61,7 @@ export class CertificateAdminService {
     const actor = await this.actor(user);
     const queue = await this.query.eligible(actor, dto.courseId);
     if (!queue.length) return { issued: 0, skipped: 0 };
-    const course = await this.prisma.course.findUniqueOrThrow({ where: { id: dto.courseId }, select: { title: true } });
+    const course = await findCourseInTenant(this.prisma, tenantOf(user), dto.courseId, { title: true });
     const template = await this.issuer.activeTemplate(actor.institutionId ?? null, dto.courseId);
     if (!template) throw new BadRequestException("This course has no active certificate template. Assign one first.");
     let issued = 0;

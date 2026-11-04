@@ -10,6 +10,7 @@ import { DRAFT_COPY_SUFFIX, LIMITS } from "../notifications.constants";
 import type { BroadcastFields, BroadcastListItem, BroadcastStatus } from "../notifications.types";
 import { BroadcastSenderService, type SendReport } from "./broadcast-sender.service";
 import { BroadcastsQueryService } from "./broadcasts-query.service";
+import { tenantOf } from "../../common/tenancy";
 
 type SaveResult = BroadcastListItem & { delivery: SendReport | null };
 
@@ -25,7 +26,7 @@ export class BroadcastAdminService {
 
   async create(actor: AuthUser, dto: SaveBroadcastDto): Promise<SaveResult> {
     const { asDraft = false, ...form } = dto;
-    const fields = await this.validated(form, asDraft);
+    const fields = await this.validated(tenantOf(actor), form, asDraft);
     const { status, sendAt } = this.lifecycle(fields, asDraft);
     const row = await this.prisma.announcement.create({
       data: { ...toBroadcastData(fields, sendAt), status, createdBy: actor.userId, institutionId: actor.institutionId ?? null },
@@ -40,7 +41,7 @@ export class BroadcastAdminService {
     if (!canEditBroadcast(status0))
       throw new BadRequestException(status0 === "SENT" ? "Sent broadcasts can't be edited. Duplicate it instead." : "Cancelled broadcasts can't be edited. Duplicate it instead.");
     const { asDraft = false, ...form } = dto;
-    const fields = await this.validated(form, asDraft);
+    const fields = await this.validated(tenantOf(actor), form, asDraft);
     const { status, sendAt } = this.lifecycle(fields, asDraft);
     // Atomic: the scheduler may be sending this very broadcast right now.
     const { count } = await this.prisma.announcement.updateMany({
@@ -106,7 +107,7 @@ export class BroadcastAdminService {
 
   // ---------------------------------------------------------------- helpers
 
-  private async validated(form: Omit<SaveBroadcastDto, "asDraft">, asDraft: boolean): Promise<BroadcastFields> {
+  private async validated(tenantId: string | null, form: Omit<SaveBroadcastDto, "asDraft">, asDraft: boolean): Promise<BroadcastFields> {
     const fields: BroadcastFields = {
       title: form.title,
       messageHtml: sanitizeRichText(form.messageHtml),
@@ -122,7 +123,7 @@ export class BroadcastAdminService {
     const errors = broadcastRuleErrors(fields, { asDraft });
     if (errors.length) throw new BadRequestException(errors);
     if (fields.courseIds.length) {
-      const found = await this.prisma.course.count({ where: { id: { in: fields.courseIds } } });
+      const found = await this.prisma.course.count({ where: { id: { in: fields.courseIds }, institutionId: tenantId } });
       if (found !== fields.courseIds.length) throw new BadRequestException(["One of the selected courses no longer exists"]);
     }
     return fields;

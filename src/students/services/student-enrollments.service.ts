@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "../../../generated/prisma";
+import { assertCoursesInTenant } from "../../common/tenancy";
 import { PrismaService } from "../../prisma/prisma.service";
 
 type Tx = Prisma.TransactionClient;
@@ -11,8 +12,9 @@ export class StudentEnrollmentsService {
 
   /** Enrolls in every course not already enrolled; returns the newly enrolled course ids. */
   async enrollInTx(tx: Tx, studentId: string, courseIds: string[]): Promise<string[]> {
-    const courses = await tx.course.findMany({ where: { id: { in: courseIds } }, select: { id: true } });
-    if (courses.length !== courseIds.length) throw new BadRequestException("One or more selected courses no longer exist.");
+    // Only courses from the student's own workspace.
+    const student = await tx.user.findUniqueOrThrow({ where: { id: studentId }, select: { institutionId: true } });
+    await assertCoursesInTenant(tx, student.institutionId, courseIds);
 
     const existing = await tx.enrollment.findMany({ where: { userId: studentId, courseId: { in: courseIds } }, select: { courseId: true } });
     const already = new Set(existing.map((e) => e.courseId));

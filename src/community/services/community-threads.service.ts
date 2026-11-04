@@ -8,6 +8,7 @@ import { joinTags } from "../community.mapper";
 import type { CommunityThread } from "../community.types";
 import type { StudentThreadDto, UpdateThreadDto } from "../dto/thread.dto";
 import { CommunityQueryService } from "./community-query.service";
+import { findCourseInTenant, tenantOf } from "../../common/tenancy";
 
 /** Content columns that bump updatedAt (= panel updateThread's contentChanged keys). */
 const CONTENT_KEYS = ["title", "bodyHtml", "category", "courseId", "moduleId", "tags"] as const;
@@ -21,9 +22,8 @@ export class CommunityThreadsService {
   ) {}
 
   /** Course must exist; module (when given) must belong to it. */
-  private async assertPlacement(courseId: string, moduleId: string) {
-    const course = await this.prisma.course.findUnique({ where: { id: courseId }, select: { id: true } });
-    if (!course) throw new NotFoundException("Select a course");
+  private async assertPlacement(tenantId: string | null, courseId: string, moduleId: string) {
+    await findCourseInTenant(this.prisma, tenantId, courseId, { id: true });
     if (moduleId) {
       const mod = await this.prisma.courseModule.findFirst({ where: { id: moduleId, courseId }, select: { id: true } });
       if (!mod) throw new BadRequestException("Select a module from this course");
@@ -38,7 +38,7 @@ export class CommunityThreadsService {
   }
 
   async create(actor: AuthUser, dto: StudentThreadDto & { isPinned?: boolean; isLocked?: boolean }): Promise<CommunityThread> {
-    await this.assertPlacement(dto.courseId, dto.moduleId);
+    await this.assertPlacement(tenantOf(actor), dto.courseId, dto.moduleId);
     const now = new Date();
     const row = await this.prisma.discussion.create({
       data: {
@@ -63,7 +63,7 @@ export class CommunityThreadsService {
   async update(current: Discussion, dto: UpdateThreadDto): Promise<CommunityThread> {
     const courseId = dto.courseId ?? current.courseId;
     const moduleId = dto.moduleId ?? (dto.courseId && dto.courseId !== current.courseId ? "" : (current.moduleId ?? ""));
-    if (dto.courseId !== undefined || dto.moduleId !== undefined) await this.assertPlacement(courseId, moduleId);
+    if (dto.courseId !== undefined || dto.moduleId !== undefined) await this.assertPlacement(current.institutionId ?? null, courseId, moduleId);
     const data: Prisma.DiscussionUpdateInput = {
       ...(dto.title !== undefined && { title: dto.title.trim() }),
       ...(dto.bodyHtml !== undefined && { body: this.cleanBody(dto.bodyHtml) }),

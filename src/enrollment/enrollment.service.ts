@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CertificateService } from "../certificate/certificate.service";
+import { findCourseInTenant, tenantOf } from "../common/tenancy";
 
 @Injectable()
 export class EnrollmentService {
@@ -54,13 +55,9 @@ export class EnrollmentService {
    * Enroll in a free course directly without payment
    */
   async enrollFreeCourse(userId: string, courseId: string) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-    });
-
-    if (!course) {
-      throw new NotFoundException("Course not found");
-    }
+    // Only courses of the student's own workspace.
+    const student = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { institutionId: true } });
+    const course = await findCourseInTenant(this.prisma, student.institutionId, courseId);
 
     if (!course.isFree && Number(course.price) > 0) {
       throw new BadRequestException(

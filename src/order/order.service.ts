@@ -6,16 +6,16 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateOrderDto } from "./dto/order.dto";
 import { Prisma } from "../../generated/prisma";
+import { findCourseInTenant, tenantOf } from "../common/tenancy";
 
 @Injectable()
 export class OrderService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, dto: CreateOrderDto) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: dto.courseId },
-    });
-    if (!course) throw new NotFoundException("Course not found");
+    // Students can only buy courses of their own workspace.
+    const buyer = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { institutionId: true } });
+    const course = await findCourseInTenant(this.prisma, buyer.institutionId, dto.courseId);
 
     const priceNumber = course.price.toNumber();
     let discount = 0;

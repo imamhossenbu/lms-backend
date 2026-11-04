@@ -1,60 +1,59 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-} from "@nestjs/common";
-import { CouponService } from "./coupon.service";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { ApiTags } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import { AuthGuard } from "@nestjs/passport";
+import { CurrentUser, ValidateDto, type AuthUser } from "../common/auth-user";
+import { tenantOf } from "../common/tenancy";
+import { CouponService } from "./coupon.service";
+import { CreateCouponDto, UpdateCouponDto } from "./dto/coupon.dto";
 
+const Id = () => Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 404 }));
+
+/** Course coupons. CRUD is scoped to the caller's workspace; `validate` is the public checkout check. */
+@ApiTags("Coupons")
 @Controller("coupon")
+@ValidateDto()
 export class CouponController {
   constructor(private readonly couponService: CouponService) {}
 
   @Get("validate/:code/:courseId")
-  async validate(
-    @Param("code") code: string,
-    @Param("courseId") courseId: string,
-  ) {
+  validate(@Param("code") code: string, @Param("courseId", new ParseUUIDPipe({ errorHttpStatusCode: 404 })) courseId: string) {
     return this.couponService.validateCoupon(code, courseId);
   }
 
   @Get()
-  @UseGuards(AuthGuard("jwt"))
-  async findAll() {
-    return this.couponService.findAll();
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  findAll(@CurrentUser() user: AuthUser) {
+    return this.couponService.findAll(tenantOf(user));
   }
 
   @Get(":id")
-  @UseGuards(AuthGuard("jwt"))
-  async findOne(@Param("id") id: string) {
-    return this.couponService.findOne(id);
+  @UseGuards(AuthGuard("jwt"), RolesGuard)
+  @Roles("ADMIN", "TEACHER")
+  findOne(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.couponService.findOne(tenantOf(user), id);
   }
 
   @Post()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
-  async create(@Body() dto: any) {
-    return this.couponService.create(dto);
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateCouponDto) {
+    return this.couponService.create(tenantOf(user), dto);
   }
 
   @Patch(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
-  async update(@Param("id") id: string, @Body() dto: any) {
-    return this.couponService.update(id, dto);
+  update(@CurrentUser() user: AuthUser, @Id() id: string, @Body() dto: UpdateCouponDto) {
+    return this.couponService.update(tenantOf(user), id, dto);
   }
 
   @Delete(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")
-  async delete(@Param("id") id: string) {
-    return this.couponService.delete(id);
+  delete(@CurrentUser() user: AuthUser, @Id() id: string) {
+    return this.couponService.delete(tenantOf(user), id);
   }
 }

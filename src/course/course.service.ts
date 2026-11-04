@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
 import { CourseQueryDto } from "./dto/course-query.dto";
+import { assertSlugFree, findCategoryInTenant, findCourseInTenant } from "../common/tenancy";
 
 @Injectable()
 export class CourseService {
@@ -24,11 +25,16 @@ export class CourseService {
     return await this.cloudinary.uploadMedia(file, "course-assets");
   }
 
+  /** Creates a course in the creator's workspace (category must be from the same workspace). */
   async create(
     dto: CreateCourseDto,
     instructorId: string,
+    tenantId: string | null,
     file?: Express.Multer.File,
   ) {
+    await findCategoryInTenant(this.prisma, tenantId, dto.categoryId);
+    await assertSlugFree(this.prisma, "course", tenantId, dto.slug);
+
     let thumbnailUrl: string | undefined = dto.thumbnail;
     if (file) {
       thumbnailUrl = await this.cloudinary.uploadImage(file);
@@ -38,6 +44,7 @@ export class CourseService {
       data: {
         ...dto,
         instructorId,
+        institutionId: tenantId,
         thumbnail: thumbnailUrl,
         status: dto.status || "DRAFT",
         price: Number(dto.price),
@@ -46,12 +53,13 @@ export class CourseService {
     });
   }
 
-  async findAll(query?: CourseQueryDto) {
+  /** Courses of one workspace (signed-in user's, or `?institution=` for the public catalogue). */
+  async findAll(tenantId: string | null, query?: CourseQueryDto) {
     const page = Number(query?.page) || 1;
     const limit = Number(query?.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { institutionId: tenantId };
 
     if (query?.status) {
       where.status = query.status;
@@ -116,9 +124,9 @@ export class CourseService {
     };
   }
 
-  async findOne(id: string) {
-    const course = await this.prisma.course.findUnique({
-      where: { id },
+  async findOne(id: string, tenantId: string | null) {
+    const course = await this.prisma.course.findFirst({
+      where: { id, institutionId: tenantId },
       include: {
         category: true,
         modules: {
@@ -142,17 +150,19 @@ export class CourseService {
     id: string,
     instructorId: string,
     role: string,
+    tenantId: string | null,
     dto: UpdateCourseDto,
     file?: Express.Multer.File,
   ) {
-    const course = await this.prisma.course.findUnique({ where: { id } });
-
-    if (!course) throw new NotFoundException("Course not found");
+    const course = await findCourseInTenant(this.prisma, tenantId, id);
     if (role !== "ADMIN" && course.instructorId !== instructorId) {
       throw new ForbiddenException(
         "You are not authorized to update this course",
       );
     }
+
+    if (dto.categoryId) await findCategoryInTenant(this.prisma, tenantId, dto.categoryId);
+    if (dto.slug) await assertSlugFree(this.prisma, "course", tenantId, dto.slug, id);
 
     let thumbnailUrl: string | undefined = undefined;
     if (file) {
@@ -173,10 +183,8 @@ export class CourseService {
     });
   }
 
-  async delete(id: string, instructorId: string, role: string) {
-    const course = await this.prisma.course.findUnique({ where: { id } });
-
-    if (!course) throw new NotFoundException("Course not found");
+  async delete(id: string, instructorId: string, role: string, tenantId: string | null) {
+    const course = await findCourseInTenant(this.prisma, tenantId, id);
 
     if (role !== "ADMIN" && course.instructorId !== instructorId) {
       throw new ForbiddenException(

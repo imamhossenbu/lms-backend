@@ -12,6 +12,7 @@ import { CommunityQueryService, type ThreadListPage } from "../community/service
 import { CommunityRepliesService } from "../community/services/community-replies.service";
 import { CommunityThreadsService } from "../community/services/community-threads.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { findCourseInTenant, tenantOf } from "../common/tenancy";
 
 /**
  * Course discussions as a member sees them: enrolled students (and the course's instructor / admins) read, post,
@@ -30,12 +31,10 @@ export class DiscussionService {
 
   /** Admins, the course's instructor, or an enrolled student. */
   private async assertMember(user: AuthUser, courseId: string) {
+    // The course must be in the caller's workspace (admins included).
+    const course = await findCourseInTenant(this.prisma, tenantOf(user), courseId, { instructorId: true });
     if (user.role === "ADMIN") return;
-    const [course, enrolled] = await Promise.all([
-      this.prisma.course.findUnique({ where: { id: courseId }, select: { instructorId: true } }),
-      this.prisma.enrollment.findUnique({ where: { userId_courseId: { userId: user.userId, courseId } }, select: { id: true } }),
-    ]);
-    if (!course) throw new NotFoundException("Course not found");
+    const enrolled = await this.prisma.enrollment.findUnique({ where: { userId_courseId: { userId: user.userId, courseId } }, select: { id: true } });
     if (!enrolled && course.instructorId !== user.userId) throw new ForbiddenException("Enroll in this course to join its discussions.");
   }
 

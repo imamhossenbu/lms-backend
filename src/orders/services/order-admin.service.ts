@@ -6,6 +6,7 @@ import { OrderLifecycleService } from "../../commerce/order-lifecycle.service";
 import { round2, statusLabel, type StatusScope } from "../../commerce/order-status";
 import { SslCommerzService } from "../../commerce/sslcommerz.service";
 import { tenantWhere, type AuthUser } from "../../common/auth-user";
+import { findCourseInTenant, tenantOf } from "../../common/tenancy";
 import { InvoiceService } from "../../invoice/invoice.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { AdditionalInfoDto, ChangeStatusDto, CreateOrderDto, EditPaymentDto } from "../dto/orders.dto";
@@ -35,8 +36,8 @@ export class OrderAdminService {
   // ---------------------------------------------------------------- create
 
   /** Coupon discount for one course, or 0. Throws a friendly error for unusable codes. */
-  private async couponFor(code: string, courseId: string, price: number) {
-    const coupon = await this.prisma.coupon.findFirst({ where: { code: { equals: code, mode: "insensitive" } } });
+  private async couponFor(tenantId: string | null, code: string, courseId: string, price: number) {
+    const coupon = await this.prisma.coupon.findFirst({ where: { institutionId: tenantId, code: { equals: code, mode: "insensitive" } } });
     if (!coupon || coupon.status !== "ACTIVE") throw new BadRequestException(`Coupon ${code.toUpperCase()} doesn't exist or isn't active.`);
     const now = new Date();
     if (coupon.courseId !== courseId) throw new BadRequestException(`Coupon ${coupon.code} doesn't apply to this course.`);
@@ -51,13 +52,12 @@ export class OrderAdminService {
   async create(actor: AuthUser, dto: CreateOrderDto, meta: { ip?: string }): Promise<OrderDetails> {
     const student = await this.prisma.user.findFirst({ where: { id: dto.studentId, role: "STUDENT", deletedAt: null, ...tenantWhere(actor) } });
     if (!student) throw new NotFoundException("Student not found.");
-    const course = await this.prisma.course.findUnique({ where: { id: dto.courseId } });
-    if (!course) throw new NotFoundException("Course not found.");
+    const course = await findCourseInTenant(this.prisma, tenantOf(actor), dto.courseId);
     if (await this.prisma.order.count({ where: { userId: student.id, courseId: course.id, status: "PAID" } }))
       throw new ConflictException(`${student.name} has already bought this course.`);
 
     const price = round2(Number(course.price));
-    const applied = dto.couponCode ? await this.couponFor(dto.couponCode, course.id, price) : null;
+    const applied = dto.couponCode ? await this.couponFor(tenantOf(actor), dto.couponCode, course.id, price) : null;
     const discount = applied?.discount ?? 0;
     const by = await this.actorName(actor);
 

@@ -1,3 +1,4 @@
+import { CatalogAccessGuard, CatalogId } from "../common/catalog-access.guard";
 import {
   Controller,
   Post,
@@ -15,7 +16,8 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 
 @Controller("courses/:courseId/modules")
-@UseGuards(AuthGuard("jwt"), RolesGuard)
+@UseGuards(AuthGuard("jwt"), RolesGuard, CatalogAccessGuard)
+@CatalogId("module")
 export class CourseModuleController {
   constructor(private readonly moduleService: CourseModuleService) {}
 

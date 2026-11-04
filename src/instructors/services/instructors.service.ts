@@ -3,6 +3,7 @@ import * as bcrypt from "bcrypt";
 import type { Prisma, User } from "../../../generated/prisma";
 import { MailService } from "../../auth/mail/mail.service";
 import { assertEmailFree, BCRYPT_ROUNDS, generatePassword } from "../../common/accounts";
+import { assertCoursesInTenant } from "../../common/tenancy";
 import { type AuthUser, tenantWhere } from "../../common/auth-user";
 import { paginated, skipTake, type Paginated } from "../../common/pagination";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -103,8 +104,9 @@ export class InstructorsService {
   /** Moves the given courses to this instructor. */
   private async assignInTx(tx: Tx, instructorId: string, courseIds: string[]) {
     if (courseIds.length === 0) return 0;
-    const found = await tx.course.count({ where: { id: { in: courseIds } } });
-    if (found !== courseIds.length) throw new BadRequestException("One or more selected courses no longer exist.");
+    // Only courses from the instructor's own workspace.
+    const instructor = await tx.user.findUniqueOrThrow({ where: { id: instructorId }, select: { institutionId: true } });
+    await assertCoursesInTenant(tx, instructor.institutionId, courseIds);
     const res = await tx.course.updateMany({ where: { id: { in: courseIds } }, data: { instructorId } });
     return res.count;
   }

@@ -8,6 +8,7 @@ import { CERT_LIMITS, TEMPLATE_COPY_SUFFIX } from "../certificates.constants";
 import type { CertificateTemplate, TemplateFields } from "../certificates.types";
 import type { CreateTemplateDto, UpdateTemplateDto } from "../dto/template.dto";
 import { CertificatesQueryService } from "./certificates-query.service";
+import { tenantOf } from "../../common/tenancy";
 
 type Tx = Prisma.TransactionClient;
 
@@ -21,7 +22,7 @@ export class CertificateTemplateAdminService {
 
   async create(actor: AuthUser, dto: CreateTemplateDto): Promise<CertificateTemplate> {
     const fields = dto as TemplateFields;
-    await this.assertValid(fields);
+    await this.assertValid(tenantOf(actor), fields);
     const row = await this.prisma.$transaction(async (tx) => {
       const t = await tx.certificateTemplate.create({ data: { ...toTemplateData(fields), institutionId: actor.institutionId ?? null } });
       await this.claimCourses(tx, actor, t.id, fields);
@@ -33,7 +34,7 @@ export class CertificateTemplateAdminService {
   async update(actor: AuthUser, id: string, dto: UpdateTemplateDto): Promise<CertificateTemplate> {
     const current = fieldsOf(toTemplate(await this.query.mustFindTemplate(actor, id)));
     const merged: TemplateFields = { ...current, ...(dto as Partial<TemplateFields>) };
-    await this.assertValid(merged);
+    await this.assertValid(tenantOf(actor), merged);
     const row = await this.prisma.$transaction(async (tx) => {
       const t = await tx.certificateTemplate.update({ where: { id }, data: toTemplateData(merged) });
       await this.claimCourses(tx, actor, id, merged);
@@ -76,12 +77,12 @@ export class CertificateTemplateAdminService {
     }
   }
 
-  private async assertValid(f: TemplateFields) {
+  private async assertValid(tenantId: string | null, f: TemplateFields) {
     const errors = templateRuleErrors(f);
     if (errors.length) throw new BadRequestException(errors);
     const ids = [...new Set(f.courseIds)];
     if (ids.length) {
-      const found = await this.prisma.course.count({ where: { id: { in: ids } } });
+      const found = await this.prisma.course.count({ where: { id: { in: ids }, institutionId: tenantId } });
       if (found !== ids.length) throw new BadRequestException(["One of the selected courses no longer exists."]);
     }
   }

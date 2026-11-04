@@ -78,17 +78,24 @@ model User {
 model Category {
   id          String   @id @default(uuid())
   name        String
-  slug        String   @unique
+  slug        String
+  /// Tenant (null = legacy single-tenant workspace). Slugs are unique per workspace.
+  institutionId String?
   description String?
   icon        String?
   status      String
   courses     Course[]
+
+  @@unique([institutionId, slug])
+  @@index([institutionId])
 }
 
 model Course {
   id               String   @id @default(uuid())
   title            String
-  slug             String   @unique
+  slug             String
+  /// Tenant (null = legacy single-tenant workspace). Slugs are unique per workspace.
+  institutionId    String?
   description      String
   shortDescription String
   thumbnail        String?
@@ -118,7 +125,9 @@ model Course {
   lessonProgress LessonProgress[]
   liveClasses    LiveClass[]
 
+  @@unique([institutionId, slug])
   @@index([instructorId])
+  @@index([institutionId, status])
 }
 
 model CourseModule {
@@ -889,7 +898,9 @@ model NotificationDelivery {
 // --- Payments & Settings ---
 model Coupon {
   id                String   @id @default(uuid())
-  code              String   @unique
+  code              String
+  /// Tenant (null = legacy single-tenant workspace). Codes are unique per workspace.
+  institutionId     String?
   discountType      String
   discountTypeValue Decimal
   courseId          String
@@ -901,6 +912,9 @@ model Coupon {
   createdAt         DateTime @default(now())
 
   orders Order[]
+
+  @@unique([institutionId, code])
+  @@index([institutionId])
 }
 
 model CouponUsage {

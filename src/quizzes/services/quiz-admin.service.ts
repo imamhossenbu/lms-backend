@@ -9,6 +9,7 @@ import { QUIZ_COPY_SUFFIX, QUIZ_LIMITS, QUIZ_SETTING_KEYS } from "../quizzes.con
 import type { QuizFields, QuizItem, QuizQuestionItem, QuizStatus } from "../quizzes.types";
 import type { CreateQuizDto, UpdateQuizDto } from "../dto/quiz.dto";
 import { QuizzesQueryService, withQuestions } from "./quizzes-query.service";
+import { findCourseInTenant, tenantOf } from "../../common/tenancy";
 
 type Tx = Prisma.TransactionClient;
 type Actor = AuthUser & { name: string };
@@ -32,7 +33,7 @@ export class QuizAdminService {
     const actor = await this.actor(user);
     const { status = "PUBLISHED", ...rest } = dto;
     const fields = this.normalize(rest);
-    await this.assertValid(fields, status);
+    await this.assertValid(tenantOf(user), fields, status);
     const id = await this.prisma.$transaction(async (tx) => {
       const quiz = await tx.quiz.create({
         data: { ...toQuizData(fields), status, institutionId: actor.institutionId ?? null, createdById: actor.userId, createdByName: actor.name },
@@ -56,7 +57,7 @@ export class QuizAdminService {
       timeLimitMinutes: patch.timeLimitMinutes === undefined ? current.timeLimitMinutes : patch.timeLimitMinutes,
     } as QuizFields);
     const nextStatus = status ?? current.status;
-    await this.assertValid(merged, nextStatus, { module: patch.moduleId !== undefined });
+    await this.assertValid(tenantOf(user), merged, nextStatus, { module: patch.moduleId !== undefined });
 
     await this.prisma.$transaction(async (tx) => {
       await tx.quiz.update({ where: { id }, data: { ...toQuizData(merged), status: nextStatus } });
@@ -133,11 +134,10 @@ export class QuizAdminService {
     return { ...f, timeLimitMinutes: f.timeLimitMinutes ?? null };
   }
 
-  private async assertValid(f: QuizFields, status: QuizStatus, check = { module: true }) {
+  private async assertValid(tenantId: string | null, f: QuizFields, status: QuizStatus, check = { module: true }) {
     const errors = [...quizRuleErrors(f), ...(status === "PUBLISHED" ? publishErrors(f) : [])];
     if (errors.length) throw new BadRequestException(errors);
-    const course = await this.prisma.course.findUnique({ where: { id: f.courseId }, select: { id: true } });
-    if (!course) throw new NotFoundException("Select a course");
+    await findCourseInTenant(this.prisma, tenantId, f.courseId, { id: true });
     if (check.module && f.moduleId) {
       const mod = await this.prisma.courseModule.findFirst({ where: { id: f.moduleId, courseId: f.courseId }, select: { id: true } });
       if (!mod) throw new BadRequestException("Select a module from this course");

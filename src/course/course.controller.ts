@@ -21,10 +21,16 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { RequestWithUser } from "../auth/interfaces/request.interface";
+import { OptionalJwtGuard } from "../common/optional-jwt.guard";
+import { resolvePublicTenant, tenantOf } from "../common/tenancy";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Controller("courses")
 export class CourseController {
-  constructor(private readonly courseService: CourseService) {}
+  constructor(
+    private readonly courseService: CourseService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post("upload-thumbnail")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
@@ -59,17 +65,20 @@ export class CourseController {
     @Req() req: RequestWithUser,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.courseService.create(dto, req.user.userId, file);
+    return this.courseService.create(dto, req.user.userId, tenantOf(req.user), file);
   }
 
+  /** Public catalogue: the signed-in user's workspace, or `?institution=<slug>`, or the legacy workspace. */
   @Get()
-  async findAll(@Query() query: CourseQueryDto) {
-    return this.courseService.findAll(query);
+  @UseGuards(OptionalJwtGuard)
+  async findAll(@Query() query: CourseQueryDto, @Query("institution") institution: string | undefined, @Req() req: Partial<RequestWithUser>) {
+    return this.courseService.findAll(await resolvePublicTenant(this.prisma, req.user as any, institution), query);
   }
 
   @Get(":id")
-  async getOne(@Param("id") id: string) {
-    return this.courseService.findOne(id);
+  @UseGuards(OptionalJwtGuard)
+  async getOne(@Param("id") id: string, @Query("institution") institution: string | undefined, @Req() req: Partial<RequestWithUser>) {
+    return this.courseService.findOne(id, await resolvePublicTenant(this.prisma, req.user as any, institution));
   }
 
   @Patch(":id")
@@ -82,19 +91,13 @@ export class CourseController {
     @Req() req: RequestWithUser,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.courseService.update(
-      id,
-      req.user.userId,
-      req.user.role,
-      dto,
-      file,
-    );
+    return this.courseService.update(id, req.user.userId, req.user.role, tenantOf(req.user), dto, file);
   }
 
   @Delete(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
   async delete(@Param("id") id: string, @Req() req: RequestWithUser) {
-    return this.courseService.delete(id, req.user.userId, req.user.role);
+    return this.courseService.delete(id, req.user.userId, req.user.role, tenantOf(req.user));
   }
 }

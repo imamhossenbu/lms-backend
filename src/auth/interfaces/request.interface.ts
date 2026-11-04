@@ -6,5 +6,7 @@ export interface RequestWithUser extends Request {
     userId: string;
     email: string;
     role: string;
+    /** SaaS tenant (null = legacy workspace). */
+    institutionId?: string | null;
   };
 }

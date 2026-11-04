@@ -12,6 +12,7 @@ import type { LiveClassFields, LiveClassListItem, LiveEnrollment, LiveQuestion, 
 import type { AnswerQuestionDto, CreateLiveClassDto, LiveResourceDto, SetAttendanceDto, UpdateLiveClassDto, UpdateLiveResourceDto } from "../dto/live-class.dto";
 import { LiveClassEventsService } from "./live-class-events.service";
 import { LiveClassesQueryService } from "./live-classes-query.service";
+import { findCourseInTenant, tenantOf } from "../../common/tenancy";
 
 const person = { select: { id: true, name: true, email: true } } as const;
 const fmt = (d: Date) => d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: WORKSPACE_TIME_ZONE });
@@ -188,8 +189,7 @@ export class LiveClassAdminService {
   private async assertValid(user: AuthUser, f: LiveClassFields, opts: { requireFuture: boolean; instructor?: boolean }) {
     const errors = liveClassRuleErrors(f, { requireFuture: opts.requireFuture });
     if (errors.length) throw new BadRequestException(errors);
-    const course = await this.prisma.course.findUnique({ where: { id: f.courseId }, select: { id: true } });
-    if (!course) throw new NotFoundException("Select a course");
+    await findCourseInTenant(this.prisma, tenantOf(user), f.courseId, { id: true });
     if (opts.instructor !== false) {
       const instructor = await this.prisma.user.findFirst({
         where: { id: f.instructorId, institutionId: user.institutionId ?? null, role: { in: [INSTRUCTOR_ROLE, "ADMIN"] } },
