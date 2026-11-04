@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, IsBoolean } from "class-validator";
+import { IsOptional, IsString, IsNumber, IsBoolean, Max, Min } from "class-validator";
 import { Type, Transform } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -51,7 +51,14 @@ export class CourseQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(1)
+  @Max(100, { message: "limit can be at most 100" })
   limit?: number = 10;
+
+  @ApiPropertyOptional({ description: "Institution slug (public catalogue; ignored when signed in)" })
+  @IsOptional()
+  @IsString()
+  institution?: string;
 
   @ApiPropertyOptional({
     description: "Sort order: newest, priceAsc, priceDesc, popular, rating",

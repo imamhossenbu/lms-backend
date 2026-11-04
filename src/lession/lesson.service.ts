@@ -58,15 +58,19 @@ export class LessonService {
     const lesson = await this.prisma.lesson.findUnique({ where: { id } });
     if (!lesson) throw new NotFoundException("Lesson not found");
 
+    // Moving between modules is only allowed inside the same course.
+    if (dto.moduleId && dto.moduleId !== lesson.moduleId) {
+      const target = await this.prisma.courseModule.findFirst({ where: { id: dto.moduleId, courseId: lesson.courseId }, select: { id: true } });
+      if (!target) throw new NotFoundException("Target module not found in this course");
+    }
+
     const updatedLesson = await this.prisma.lesson.update({
       where: { id },
       data: dto,
     });
 
-    await this.durationService.updateDurations(
-      lesson.courseId,
-      lesson.moduleId,
-    );
+    await this.durationService.updateDurations(lesson.courseId, lesson.moduleId);
+    if (dto.moduleId && dto.moduleId !== lesson.moduleId) await this.durationService.updateDurations(lesson.courseId, dto.moduleId);
     return updatedLesson;
   }
 

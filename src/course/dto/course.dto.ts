@@ -1,3 +1,4 @@
+import { ToBoolean, ToNumber } from "../../common/transforms";
 import {
   IsString,
   IsNotEmpty,
@@ -15,9 +16,9 @@ export class CreateCourseDto {
   @IsString() @IsNotEmpty() categoryId!: string;
   @IsString() @IsNotEmpty() level!: string;
   @IsString() @IsNotEmpty() language!: string;
-  @IsNumber() price!: number;
-  @IsBoolean() @IsOptional() isFree?: boolean;
-  @IsNumber() @IsNotEmpty() durationMinutes!: number;
+  @ToNumber() @IsNumber() price!: number;
+  @ToBoolean() @IsBoolean() @IsOptional() isFree?: boolean;
+  @ToNumber() @IsNumber() @IsNotEmpty() durationMinutes!: number;
   @IsOptional() @IsString() thumbnail?: string;
   @IsOptional() @IsString() status?: string;
   @IsOptional() requirements?: string;

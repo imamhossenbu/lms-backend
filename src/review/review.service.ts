@@ -35,7 +35,7 @@ export class ReviewService {
     }
 
     return await this.prisma.courseReview.create({
-      data: { ...data, userId, status: "PENDING" },
+      data: { courseId: data.courseId, rating: data.rating, reviewText: data.reviewText ?? null, userId, status: "PENDING" },
     });
   }
 
@@ -58,17 +58,18 @@ export class ReviewService {
 
     return await this.prisma.courseReview.update({
       where: { id },
-      data: { ...data, status: "PENDING" },
+      data: { rating: data.rating, reviewText: data.reviewText ?? null, status: "PENDING" },
     });
   }
 
-  async deleteReview(id: string, userId: string, userRole: string) {
-    const review = await this.prisma.courseReview.findUnique({ where: { id } });
+  /** Owner, or an admin of the course's workspace. */
+  async deleteReview(id: string, userId: string, userRole: string, tenantId: string | null) {
+    const review = await this.prisma.courseReview.findUnique({ where: { id }, include: { course: { select: { institutionId: true } } } });
 
     if (!review) throw new NotFoundException("Review not found");
 
     const isOwner = review.userId === userId;
-    const isAdmin = userRole === "ADMIN";
+    const isAdmin = userRole === "ADMIN" && review.course.institutionId === tenantId;
 
     if (!isOwner && !isAdmin) {
       throw new ForbiddenException("Unauthorized");
@@ -79,7 +80,10 @@ export class ReviewService {
     return deleted;
   }
 
-  async updateStatus(id: string, status: "APPROVED" | "REJECTED") {
+  /** Moderation — only reviews on courses of the admin's workspace. */
+  async updateStatus(tenantId: string | null, id: string, status: "APPROVED" | "REJECTED") {
+    const review = await this.prisma.courseReview.findFirst({ where: { id, course: { institutionId: tenantId } }, select: { id: true } });
+    if (!review) throw new NotFoundException("Review not found");
     const updated = await this.prisma.courseReview.update({
       where: { id },
       data: { status },
@@ -120,8 +124,9 @@ export class ReviewService {
     });
   }
 
-  async getAllReviews() {
+  async getAllReviews(tenantId: string | null) {
     return await this.prisma.courseReview.findMany({
+      where: { course: { institutionId: tenantId } },
       orderBy: { createdAt: "desc" },
       include: {
         course: true,

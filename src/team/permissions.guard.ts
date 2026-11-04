@@ -10,6 +10,8 @@ const ALLOW_PENDING_2FA_KEY = "team:allow-pending-2fa";
 interface RequiredPermission {
   module: TeamModule;
   action: PermissionAction;
+  /** Only enforce for ADMIN staff; other roles (TEACHER, STUDENT) rely on the endpoint's own role / ownership checks. */
+  staffOnly?: boolean;
 }
 
 /**
@@ -32,6 +34,7 @@ export class PermissionsGuard implements CanActivate {
     const required = this.reflector.getAllAndOverride<RequiredPermission>(PERMISSION_KEY, [context.getHandler(), context.getClass()]);
     if (!required) return true;
     const req = context.switchToHttp().getRequest();
+    if (required.staffOnly && req.user?.role !== "ADMIN") return true;
     req.teamAccess ??= await this.access.actor(req.user);
     if (req.teamAccess.twoFactorSetupRequired && !this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_2FA_KEY, [context.getHandler(), context.getClass()]))
       throw new ForbiddenException({ statusCode: 403, error: "Forbidden", code: "TWO_FACTOR_SETUP_REQUIRED", message: TWO_FACTOR_SETUP_MESSAGE });
@@ -44,6 +47,14 @@ export class PermissionsGuard implements CanActivate {
 /** `@RequirePermission("students", "manage")` — staff permission check for one endpoint. */
 export const RequirePermission = (module: TeamModule, action: PermissionAction) =>
   applyDecorators(SetMetadata(PERMISSION_KEY, { module, action }), UseGuards(PermissionsGuard));
+
+/**
+ * For endpoints shared by staff and other roles (e.g. courses: admins AND instructors): ADMIN callers need the
+ * team permission; TEACHER / STUDENT callers skip this check and are governed by @Roles + ownership checks.
+ * Put it ABOVE the method's @UseGuards(AuthGuard("jwt"), RolesGuard) so authentication runs first.
+ */
+export const StaffPermission = (module: TeamModule, action: PermissionAction) =>
+  applyDecorators(SetMetadata(PERMISSION_KEY, { module, action, staffOnly: true }), UseGuards(PermissionsGuard));
 
 /** Lets staff who still have to set up required 2FA use this endpoint (e.g. reading Settings). */
 export const AllowPendingTwoFactor = () => SetMetadata(ALLOW_PENDING_2FA_KEY, true);

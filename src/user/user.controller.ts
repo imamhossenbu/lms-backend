@@ -9,6 +9,7 @@ import {
   UploadedFile,
   Delete,
   Param,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -17,9 +18,17 @@ import { UserService } from "./user.service";
 import { RequestWithUser } from "../auth/interfaces/request.interface";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { CloudinaryService } from "./../cloudinary/cloudinary.service";
+import { ValidateDto } from "../common/auth-user";
+import { RequirePermission } from "../team/permissions.guard";
+import { ChangeOwnPasswordDto, ChangeRoleDto, ChangeStatusDto, UpdateProfileDto } from "./dto/user.dto";
 
+/**
+ * Own account (me / profile / password) for every signed-in user, plus legacy admin tools for learners and
+ * instructors of the admin's workspace. Staff accounts are managed from Team & Roles.
+ */
 @Controller("user")
 @UseGuards(AuthGuard("jwt"), RolesGuard)
+@ValidateDto()
 export class UserController {
   constructor(
     private readonly userService: UserService,
@@ -33,56 +42,41 @@ export class UserController {
 
   @Patch("profile")
   @UseInterceptors(FileInterceptor("avatar"))
-  async updateProfile(
-    @Req() req: RequestWithUser,
-    @Body() data: any,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    let avatarUrl: string | undefined = undefined;
-
-    if (file) {
-      avatarUrl = await this.cloudinaryService.uploadImage(file);
-    }
-
-    return this.userService.updateProfile(req.user.userId, data, avatarUrl);
+  async updateProfile(@Req() req: RequestWithUser, @Body() dto: UpdateProfileDto, @UploadedFile() file: Express.Multer.File) {
+    const avatarUrl = file ? await this.cloudinaryService.uploadImage(file) : undefined;
+    return this.userService.updateProfile(req.user.userId, dto, avatarUrl);
   }
 
   @Patch("change-password")
-  async changePassword(
-    @Req() req: RequestWithUser,
-    @Body() body: { currentPassword: string; newPassword: string },
-  ) {
-    return this.userService.changePassword(
-      req.user.userId,
-      body.currentPassword,
-      body.newPassword,
-    );
+  async changePassword(@Req() req: RequestWithUser, @Body() dto: ChangeOwnPasswordDto) {
+    return this.userService.changePassword(req.user.userId, dto.currentPassword, dto.newPassword);
   }
 
   @Patch("admin/change-role")
   @Roles("ADMIN")
-  async changeRole(@Body() body: { userId: string; role: string }) {
-    return this.userService.changeUserRole(body.userId, body.role);
+  @RequirePermission("instructors", "manage")
+  async changeRole(@Req() req: RequestWithUser, @Body() dto: ChangeRoleDto) {
+    return this.userService.changeUserRole(req.user, dto.userId, dto.role);
   }
-
 
   @Get("all")
   @Roles("ADMIN")
-  async getAllUsers() {
-    return await this.userService.findAll();
+  @RequirePermission("students", "view")
+  async getAllUsers(@Req() req: RequestWithUser) {
+    return this.userService.findAll(req.user);
   }
 
   @Patch("admin/change-status")
   @Roles("ADMIN")
-  async blockUser(@Body() body: { userId: string; status: string }) {
-    return await this.userService.toggleBlockStatus(body.userId, body.status);
+  @RequirePermission("students", "manage")
+  async blockUser(@Req() req: RequestWithUser, @Body() dto: ChangeStatusDto) {
+    return this.userService.toggleBlockStatus(req.user, dto.userId, dto.status);
   }
-
-
 
   @Delete("admin/:id")
   @Roles("ADMIN")
-  async deleteUser(@Param("id") id: string) {
-    return await this.userService.deleteUser(id);
+  @RequirePermission("students", "delete")
+  async deleteUser(@Req() req: RequestWithUser, @Param("id", new ParseUUIDPipe({ errorHttpStatusCode: 404 })) id: string) {
+    return this.userService.deleteUser(req.user, id);
   }
 }

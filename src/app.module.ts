@@ -41,6 +41,7 @@ import { StudentsModule } from "./students/students.module";
 import { InstructorsModule } from "./instructors/instructors.module";
 import { TeamModule } from "./team/team.module";
 import { OrdersModule } from "./orders/orders.module";
+import { HealthModule } from "./health/health.module";
 import { AssignmentsModule } from "./assignments/assignments.module";
 import { QuizzesModule } from "./quizzes/quizzes.module";
 import { LiveClassesModule } from "./live-classes/live-classes.module";
@@ -90,6 +91,7 @@ import { CertificatesModule } from "./certificates/certificates.module";
     InstructorsModule,
     TeamModule,
     OrdersModule,
+    HealthModule,
     AssignmentsModule,
     QuizzesModule,
     LiveClassesModule,

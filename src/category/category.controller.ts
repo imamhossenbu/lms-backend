@@ -1,3 +1,5 @@
+import { ValidateDto } from "../common/auth-user";
+import { RequirePermission } from "../team/permissions.guard";
 import {
   Controller,
   Post,
@@ -24,12 +26,14 @@ import { resolvePublicTenant, tenantOf } from "../common/tenancy";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Controller("categories")
+@ValidateDto()
 export class CategoryController {
   constructor(
     private readonly categoryService: CategoryService,
     private readonly prisma: PrismaService,
   ) {}
 
+  @RequirePermission("categories", "manage")
   @Post()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")
@@ -49,6 +53,7 @@ export class CategoryController {
     return this.categoryService.findAll(await resolvePublicTenant(this.prisma, req.user as any, institution));
   }
 
+  @RequirePermission("categories", "manage")
   @Patch(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")
@@ -62,6 +67,7 @@ export class CategoryController {
     return this.categoryService.update(tenantOf(req.user), id, dto, file);
   }
 
+  @RequirePermission("categories", "delete")
   @Delete(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")

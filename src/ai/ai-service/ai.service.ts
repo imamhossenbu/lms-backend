@@ -125,12 +125,13 @@ export class AiService {
   /**
    * Helper to build curriculum context from course and lesson IDs
    */
-  private async buildCurriculumContext(courseId?: string, lessonId?: string): Promise<string> {
+  /** Course / lesson text for the prompt — only from the caller's own workspace. */
+  private async buildCurriculumContext(tenantId: string | null, courseId?: string, lessonId?: string): Promise<string> {
     let context = "";
 
     if (courseId) {
-      const course = await this.prisma.course.findUnique({
-        where: { id: courseId },
+      const course = await this.prisma.course.findFirst({
+        where: { id: courseId, institutionId: tenantId },
         select: { title: true, description: true },
       });
       if (course) {
@@ -139,8 +140,8 @@ export class AiService {
     }
 
     if (lessonId) {
-      const lesson = await this.prisma.lesson.findUnique({
-        where: { id: lessonId },
+      const lesson = await this.prisma.lesson.findFirst({
+        where: { id: lessonId, module: { course: { institutionId: tenantId } } },
         select: { title: true, content: true },
       });
       if (lesson) {
@@ -154,8 +155,8 @@ export class AiService {
   /**
    * Standard AI Tutor / Doubt Solver for students
    */
-  async askTutor(dto: AskTutorDto) {
-    const context = await this.buildCurriculumContext(dto.courseId, dto.lessonId);
+  async askTutor(dto: AskTutorDto, tenantId: string | null) {
+    const context = await this.buildCurriculumContext(tenantId, dto.courseId, dto.lessonId);
 
     const systemInstruction = `You are a supportive, encouraging, and knowledgeable AI Tutor on the LMS Platform. 
 Your goal is to help students understand concepts deeply, clarify doubts, and provide clear step-by-step explanations.
@@ -173,13 +174,13 @@ Be clear, accurate, and format responses with clean markdown when helpful.`;
   /**
    * Real-time Streaming AI Tutor Chat (SSE - Server-Sent Events)
    */
-  async streamTutorChat(dto: AskTutorDto, res: Response): Promise<void> {
+  async streamTutorChat(dto: AskTutorDto, res: Response, tenantId: string | null): Promise<void> {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
 
-    const context = await this.buildCurriculumContext(dto.courseId, dto.lessonId);
+    const context = await this.buildCurriculumContext(tenantId, dto.courseId, dto.lessonId);
 
     const systemInstruction = `You are a supportive, encouraging, and knowledgeable AI Tutor on the LMS Platform. 
 Your goal is to help students understand concepts deeply, clarify doubts, and provide clear step-by-step explanations.
@@ -436,13 +437,13 @@ Return ONLY a valid JSON object in this exact schema:
   /**
    * AI Lesson Summarizer & Key Notes Generator
    */
-  async summarizeLesson(dto: SummarizeLessonDto) {
+  async summarizeLesson(dto: SummarizeLessonDto, tenantId: string | null) {
     let contentToSummarize = dto.content || "";
     let title = dto.lessonTitle || "Lesson Summary";
 
     if (dto.lessonId) {
-      const lesson = await this.prisma.lesson.findUnique({
-        where: { id: dto.lessonId },
+      const lesson = await this.prisma.lesson.findFirst({
+        where: { id: dto.lessonId, module: { course: { institutionId: tenantId } } },
       });
       if (lesson) {
         title = lesson.title;

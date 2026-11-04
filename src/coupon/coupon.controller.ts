@@ -1,3 +1,4 @@
+import { StaffPermission } from "../team/permissions.guard";
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags } from "@nestjs/swagger";
@@ -22,6 +23,7 @@ export class CouponController {
     return this.couponService.validateCoupon(code, courseId);
   }
 
+  @StaffPermission("courses", "view")
   @Get()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -29,6 +31,7 @@ export class CouponController {
     return this.couponService.findAll(tenantOf(user));
   }
 
+  @StaffPermission("courses", "view")
   @Get(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -36,6 +39,7 @@ export class CouponController {
     return this.couponService.findOne(tenantOf(user), id);
   }
 
+  @StaffPermission("courses", "manage")
   @Post()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -43,6 +47,7 @@ export class CouponController {
     return this.couponService.create(tenantOf(user), dto);
   }
 
+  @StaffPermission("courses", "manage")
   @Patch(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -50,6 +55,7 @@ export class CouponController {
     return this.couponService.update(tenantOf(user), id, dto);
   }
 
+  @StaffPermission("courses", "delete")
   @Delete(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN")

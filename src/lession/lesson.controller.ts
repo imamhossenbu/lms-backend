@@ -1,3 +1,5 @@
+import { ValidateDto } from "../common/auth-user";
+import { StaffPermission } from "../team/permissions.guard";
 import { CatalogAccessGuard, CatalogId } from "../common/catalog-access.guard";
 import {
   Controller,
@@ -17,11 +19,13 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 
 @Controller("courses/:courseId/modules/:moduleId/lessons")
+@ValidateDto()
 @UseGuards(AuthGuard("jwt"), RolesGuard, CatalogAccessGuard)
 @CatalogId("lesson")
 export class LessonController {
   constructor(private readonly lessonService: LessonService) {}
 
+  @StaffPermission("courses", "manage")
   @Post()
   @Roles("ADMIN", "TEACHER")
   async create(
@@ -42,12 +46,14 @@ export class LessonController {
     return this.lessonService.findOne(req.user.userId, req.user.role, id);
   }
 
+  @StaffPermission("courses", "manage")
   @Patch(":id")
   @Roles("ADMIN", "TEACHER")
   async update(@Param("id") id: string, @Body() dto: UpdateLessonDto) {
     return this.lessonService.update(id, dto);
   }
 
+  @StaffPermission("courses", "manage")
   @Delete(":id")
   @Roles("ADMIN", "TEACHER")
   async delete(@Param("id") id: string) {

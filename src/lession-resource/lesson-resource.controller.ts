@@ -1,3 +1,5 @@
+import { ValidateDto } from "../common/auth-user";
+import { StaffPermission } from "../team/permissions.guard";
 import { CatalogAccessGuard, CatalogId } from "../common/catalog-access.guard";
 import {
   Controller,
@@ -21,11 +23,13 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 
 @Controller("lessons/:lessonId/resources")
+@ValidateDto()
 @UseGuards(AuthGuard("jwt"), RolesGuard, CatalogAccessGuard)
 @CatalogId("resource")
 export class LessonResourceController {
   constructor(private readonly resourceService: LessonResourceService) {}
 
+  @StaffPermission("courses", "manage")
   @Post()
   @Roles("ADMIN", "TEACHER")
   @UseInterceptors(FileInterceptor("file"))
@@ -46,6 +50,7 @@ export class LessonResourceController {
   async findAll(@Param("lessonId") lessonId: string) {
     return this.resourceService.findAllByLesson(lessonId);
   }
+  @StaffPermission("courses", "manage")
   @Patch(":id")
   @Roles("ADMIN", "TEACHER")
   @UseInterceptors(FileInterceptor("file"))
@@ -57,6 +62,7 @@ export class LessonResourceController {
     return this.resourceService.update(id, dto, file);
   }
 
+  @StaffPermission("courses", "manage")
   @Delete(":id")
   @Roles("ADMIN", "TEACHER")
   async delete(@Param("id") id: string) {

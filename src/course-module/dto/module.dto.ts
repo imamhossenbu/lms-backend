@@ -1,3 +1,4 @@
+import { ToBoolean, ToNumber } from "../../common/transforms";
 import {
   IsString,
   IsNotEmpty,
@@ -9,13 +10,13 @@ import {
 export class CreateModuleDto {
   @IsString() @IsNotEmpty() title!: string;
   @IsString() @IsOptional() description?: string;
-  @IsNumber() @IsNotEmpty() order!: number;
-  @IsBoolean() @IsOptional() isLocked?: boolean;
+  @ToNumber() @IsNumber() @IsNotEmpty() order!: number;
+  @ToBoolean() @IsBoolean() @IsOptional() isLocked?: boolean;
 }
 
 export class UpdateModuleDto {
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() description?: string;
-  @IsOptional() @IsNumber() order?: number;
-  @IsOptional() @IsBoolean() isLocked?: boolean;
+  @IsOptional() @ToNumber() @IsNumber() order?: number;
+  @IsOptional() @ToBoolean() @IsBoolean() isLocked?: boolean;
 }

@@ -1,3 +1,4 @@
+import { ToBoolean, ToNumber } from "../../common/transforms";
 import { IsString, IsNotEmpty, IsBoolean, IsOptional } from "class-validator";
 
 export class CreateLessonResourceDto {
@@ -5,5 +6,5 @@ export class CreateLessonResourceDto {
   @IsString() @IsNotEmpty() fileUrl!: string;
   @IsString() @IsNotEmpty() fileType!: string; // e.g., 'PDF', 'ZIP', 'PPT'
   @IsString() @IsNotEmpty() size!: string; // e.g., '2MB'
-  @IsBoolean() @IsOptional() isDownloadable?: boolean;
+  @ToBoolean() @IsBoolean() @IsOptional() isDownloadable?: boolean;
 }

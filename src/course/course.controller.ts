@@ -1,3 +1,5 @@
+import { ValidateDto } from "../common/auth-user";
+import { StaffPermission } from "../team/permissions.guard";
 import {
   Controller,
   Post,
@@ -26,12 +28,14 @@ import { resolvePublicTenant, tenantOf } from "../common/tenancy";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Controller("courses")
+@ValidateDto()
 export class CourseController {
   constructor(
     private readonly courseService: CourseService,
     private readonly prisma: PrismaService,
   ) {}
 
+  @StaffPermission("courses", "manage")
   @Post("upload-thumbnail")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -44,6 +48,7 @@ export class CourseController {
     return { url };
   }
 
+  @StaffPermission("courses", "manage")
   @Post("upload-media")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -56,6 +61,7 @@ export class CourseController {
     return { url };
   }
 
+  @StaffPermission("courses", "manage")
   @Post()
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -81,6 +87,7 @@ export class CourseController {
     return this.courseService.findOne(id, await resolvePublicTenant(this.prisma, req.user as any, institution));
   }
 
+  @StaffPermission("courses", "manage")
   @Patch(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")
@@ -94,6 +101,7 @@ export class CourseController {
     return this.courseService.update(id, req.user.userId, req.user.role, tenantOf(req.user), dto, file);
   }
 
+  @StaffPermission("courses", "delete")
   @Delete(":id")
   @UseGuards(AuthGuard("jwt"), RolesGuard)
   @Roles("ADMIN", "TEACHER")

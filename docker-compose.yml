@@ -11,8 +11,10 @@ services:
     environment:
       - PORT=4000
       - NODE_ENV=production
+      # nginx sits in front: trust one proxy hop for req.ip (rate limits, login IP, audit log)
+      - TRUST_PROXY=1
     healthcheck:
-      test: ["CMD-SHELL", "node -e 'require(\"http\").get(\"http://localhost:4000/api/docs\", (res) => { if (res.statusCode < 500) process.exit(0); else process.exit(1); })' || exit 1"]
+      test: ["CMD-SHELL", "node -e 'require(\"http\").get(\"http://localhost:4000/health\", (res) => { if (res.statusCode < 500) process.exit(0); else process.exit(1); })' || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

@@ -11,6 +11,9 @@ import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { Roles } from "../../auth/decorators/roles.decorator";
 import { AiService } from "./ai.service";
+import { CurrentUser, type AuthUser } from "../../common/auth-user";
+import { tenantOf } from "../../common/tenancy";
+import { StaffPermission } from "../../team/permissions.guard";
 import {
   AskTutorDto,
   GenerateQuizDto,
@@ -29,8 +32,8 @@ export class AiController {
    * Standard AI Tutor / Doubt Solver
    */
   @Post("tutor-chat")
-  async askTutor(@Body(new ValidationPipe({ transform: true })) dto: AskTutorDto) {
-    return this.aiService.askTutor(dto);
+  async askTutor(@Body(new ValidationPipe({ transform: true })) dto: AskTutorDto, @CurrentUser() user: AuthUser) {
+    return this.aiService.askTutor(dto, tenantOf(user));
   }
 
   /**
@@ -40,8 +43,9 @@ export class AiController {
   async streamTutorChat(
     @Body(new ValidationPipe({ transform: true })) dto: AskTutorDto,
     @Res() res: Response,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.aiService.streamTutorChat(dto, res);
+    return this.aiService.streamTutorChat(dto, res, tenantOf(user));
   }
 
   /**
@@ -50,8 +54,9 @@ export class AiController {
   @Post("summarize-lesson")
   async summarizeLesson(
     @Body(new ValidationPipe({ transform: true })) dto: SummarizeLessonDto,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.aiService.summarizeLesson(dto);
+    return this.aiService.summarizeLesson(dto, tenantOf(user));
   }
 
   /**
@@ -67,6 +72,7 @@ export class AiController {
   /**
    * Auto-generate quiz questions with options and explanations
    */
+  @StaffPermission("courses", "manage")
   @Post("generate-quiz")
   @UseGuards(RolesGuard)
   @Roles("TEACHER", "ADMIN")
@@ -79,6 +85,7 @@ export class AiController {
   /**
    * Auto-generate full course syllabus with modules and lessons
    */
+  @StaffPermission("courses", "manage")
   @Post("generate-course-outline")
   @UseGuards(RolesGuard)
   @Roles("TEACHER", "ADMIN")
@@ -92,6 +99,7 @@ export class AiController {
   /**
    * Evaluate a student submission with automated grading and detailed feedback
    */
+  @StaffPermission("courses", "manage")
   @Post("evaluate-assignment")
   @UseGuards(RolesGuard)
   @Roles("TEACHER", "ADMIN")
