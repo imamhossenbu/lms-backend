@@ -60,6 +60,7 @@ export class StudentsService {
       ...this.scope(actor),
       ...(query.status ? { status: { in: STATUSES_FOR_LABEL[query.status] } } : {}),
       ...(query.courseId ? { enrollments: { some: { courseId: query.courseId } } } : {}),
+      ...(query.joinedWithinDays ? { createdAt: { gte: new Date(Date.now() - query.joinedWithinDays * 86_400_000) } } : {}),
       ...(query.q
         ? {
             OR: [

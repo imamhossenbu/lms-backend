@@ -12,6 +12,7 @@ dev database. These are not Jest tests and are not part of `npm test`.
 | `plan-limits.live.ts` | Plan features, usage limits and inactive workspaces (403 codes) |
 | `endpoint-sweep.live.ts` | Calls every Swagger route as anonymous / admin / student and flags any 5xx |
 | `panel-auth.e2e.live.ts` | Browser test of the admin panel: 2FA login, permission-aware sidebar, accept-invite, required 2FA |
+| `panel-students.e2e.live.ts` | Browser test of the panel Students pages: list search / filters / URL state, create with enrollment, inline edit, notes, enroll / unenroll, workspace isolation, delete |
 | `owner-console.e2e.live.ts` | Browser test of the Owner Console: owner sign-in, snapshot pages, create institution, coupons, settings, alerts read-state, "Open as owner" into the panel, expired session |
 
 ## Running

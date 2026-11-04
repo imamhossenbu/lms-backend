@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -20,6 +20,7 @@ import type { StudentNoteCategoryValue, StudentStatusLabel } from "../students.t
 const trim = () => Transform(({ value }) => (typeof value === "string" ? value.trim() : value));
 const trimLower = () => Transform(({ value }) => (typeof value === "string" ? value.trim().toLowerCase() : value));
 const PHONE_RE = /^$|^\+?[0-9 ()-]{7,20}$/;
+const JOINED_WITHIN_DAYS = [7, 30, 90] as const;
 
 // ---------------------------------------------------------------- list
 
@@ -33,6 +34,12 @@ export class StudentQueryDto extends PaginationQueryDto {
 
   /** Only students enrolled in this course. */
   @IsOptional() @IsUUID("all", { message: "courseId must be a valid id" }) courseId?: string;
+
+  /** Only students who joined in the last 7, 30 or 90 days. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn(JOINED_WITHIN_DAYS, { message: "joinedWithinDays must be 7, 30 or 90" })
+  joinedWithinDays?: (typeof JOINED_WITHIN_DAYS)[number];
 
   @IsOptional() @IsIn(["joinDate", "name"]) sortBy: "joinDate" | "name" = "joinDate";
   @IsOptional() @IsIn(["asc", "desc"]) sortOrder: "asc" | "desc" = "desc";
