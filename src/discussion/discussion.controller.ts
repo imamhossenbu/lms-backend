@@ -1,3 +1,4 @@
+import { RequireFeature } from "../plan-access/require-feature.guard";
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
@@ -31,6 +32,7 @@ export class DiscussionController {
     return this.service.detail(user, id);
   }
 
+  @RequireFeature("community")
   @Post()
   @ApiOperation({ summary: "Start a discussion in an enrolled course (announcements are staff-only)" })
   create(@CurrentUser() user: AuthUser, @Body() dto: StudentThreadDto) {

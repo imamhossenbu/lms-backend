@@ -1,3 +1,4 @@
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
@@ -38,6 +39,7 @@ export class SaasInstitutionsService {
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly coupons: CouponRedemptionsService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   private get prisma() {
@@ -69,6 +71,8 @@ export class SaasInstitutionsService {
 
   /** Institution + its invoices + timeline (detail page / institution billing page). */
   async detail(id: string): Promise<{ institution: InstitutionView; invoices: InvoiceView[]; events: EventView[] }> {
+    await this.core.mustInstitution(this.prisma, id);
+    await this.planAccess.refreshUsage(id); // usage bars always show real counts
     const institution = await this.core.mustInstitution(this.prisma, id);
     const [invoices, events] = await Promise.all([
       this.prisma.saasInvoice.findMany({ where: { institutionId: id }, orderBy: { issuedAt: "desc" } }),

@@ -9,12 +9,14 @@ import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
 import { CourseQueryDto } from "./dto/course-query.dto";
 import { assertSlugFree, findCategoryInTenant, findCourseInTenant } from "../common/tenancy";
+import { PlanAccessService } from "../plan-access/plan-access.service";
 
 @Injectable()
 export class CourseService {
   constructor(
     private prisma: PrismaService,
     private cloudinary: CloudinaryService,
+    private plans: PlanAccessService,
   ) {}
 
   async uploadThumbnail(file: Express.Multer.File): Promise<string> {
@@ -32,6 +34,7 @@ export class CourseService {
     tenantId: string | null,
     file?: Express.Multer.File,
   ) {
+    await this.plans.assertCanAdd(tenantId, "courses");
     await findCategoryInTenant(this.prisma, tenantId, dto.categoryId);
     await assertSlugFree(this.prisma, "course", tenantId, dto.slug);
 

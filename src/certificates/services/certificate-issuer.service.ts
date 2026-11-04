@@ -9,6 +9,7 @@ import { verifyUrl } from "../certificates.constants";
 import type { CertificateRecipient, IssueMethod } from "../certificates.types";
 import { CertificateEligibilityService, validNow } from "./certificate-eligibility.service";
 import { CertificateEventsService } from "./certificate-events.service";
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 
 export interface IssueActor {
   userId: string | null;
@@ -46,6 +47,7 @@ export class CertificateIssuerService {
     private readonly eligibility: CertificateEligibilityService,
     private readonly mail: MailService,
     private readonly notifications: NotificationService,
+    private readonly plans: PlanAccessService,
   ) {}
 
   /** The workspace's ACTIVE template for a course. */
@@ -138,6 +140,7 @@ export class CertificateIssuerService {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { institutionId: true, deletedAt: true } });
     if (!user || user.deletedAt) return null;
     const institutionId = user.institutionId ?? null;
+    if (!(await this.plans.hasFeature(institutionId, "certificates"))) return null;
     const template = await this.activeTemplate(institutionId, courseId, { autoIssue: true });
     if (!template || (await this.hasValid(userId, courseId))) return null;
     const [progress] = await this.eligibility.courseProgress(courseId, { institutionId }, [userId]);

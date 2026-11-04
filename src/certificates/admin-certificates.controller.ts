@@ -1,3 +1,4 @@
+import { RequireFeature } from "../plan-access/require-feature.guard";
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
@@ -80,6 +81,7 @@ export class AdminCertificatesController {
     return this.admin.verify(user, dto.code);
   }
 
+  @RequireFeature("certificates")
   @Post("issue")
   @RequirePermission("certificates", "manage")
   @ApiOperation({ summary: "Issue a certificate manually (course needs an ACTIVE template)" })
@@ -87,6 +89,7 @@ export class AdminCertificatesController {
     return this.admin.issue(user, dto);
   }
 
+  @RequireFeature("certificates")
   @Post("issue-eligible")
   @HttpCode(200)
   @RequirePermission("certificates", "manage")

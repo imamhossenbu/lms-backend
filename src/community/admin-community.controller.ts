@@ -1,3 +1,4 @@
+import { RequireFeature } from "../plan-access/require-feature.guard";
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
@@ -75,6 +76,7 @@ export class AdminCommunityController {
 
   // ---------------------------------------------------------------- threads
 
+  @RequireFeature("community")
   @Post("threads")
   @RequirePermission("community", "manage")
   @ApiOperation({ summary: "New Discussion form (posted as the signed-in admin)" })

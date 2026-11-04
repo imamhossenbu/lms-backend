@@ -8,6 +8,7 @@ import { cycleLabel, DAY_MS, fmtDate, fmtLimitValue, money, periodEndFrom, planC
 import type { BillingCycle, InstitutionView, InvoiceView, SaasActorKind } from "../saas.types";
 import { SaasCoreService } from "./saas-core.service";
 import { SaasPaymentGateway } from "./saas-payment.gateway";
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 
 export interface ChangePlanResult {
   institution: InstitutionView;
@@ -22,10 +23,12 @@ export class SaasSubscriptionService {
     private readonly core: SaasCoreService,
     private readonly gateway: SaasPaymentGateway,
     private readonly coupons: CouponRedemptionsService,
+    private readonly plans: PlanAccessService,
   ) {}
 
   /** Read-only preview of a plan change (what `changePlan` would charge / block). */
   async preview(institutionId: string, planId: string, cycle: BillingCycle) {
+    await this.plans.refreshUsage(institutionId);
     const [plans, inst] = await Promise.all([this.core.plans(), this.core.mustInstitution(this.core.prisma, institutionId)]);
     await this.core.mustPlan(this.core.prisma, planId);
     return planChangePreview(plans, inst, planId, cycle);
@@ -37,6 +40,8 @@ export class SaasSubscriptionService {
    * An optional `couponCode` is redeemed for the target plan / cycle and discounts this and later invoices.
    */
   async changePlan(institutionId: string, planId: string, cycle: BillingCycle, actor: SaasActorKind, couponCode?: string): Promise<ChangePlanResult> {
+    // Usage limits on the target plan must be checked against real counts.
+    await this.plans.refreshUsage(institutionId);
     return this.core.tx(async (tx) => {
       const inst = await this.core.mustInstitution(tx, institutionId);
       const target = await this.core.mustPlan(tx, planId);
@@ -213,6 +218,7 @@ export class SaasSubscriptionService {
 
   /** Trial → paid: charges the first period now (less any coupon discount) on the given payment method. */
   async convertTrial(institutionId: string, planId: string, cycle: BillingCycle, pm: PaymentMethodDto, actor: SaasActorKind, couponCode?: string): Promise<InstitutionView> {
+    await this.plans.refreshUsage(institutionId);
     return this.core.tx(async (tx) => {
       const inst = await this.core.mustInstitution(tx, institutionId);
       if (inst.subscription.status !== "TRIALING") throw new BadRequestException("This institution isn't on a trial.");

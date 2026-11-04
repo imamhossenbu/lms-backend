@@ -9,6 +9,7 @@ import { countPermissions, normalizeExtras } from "../team-permissions";
 import { assertCanGrant, plural } from "../team.rules";
 import type { TeamMemberView } from "../team.types";
 import { memberInclude, rolePermissions, STAFF_ROLE, TeamAccessService, toMemberView, type ActorContext, type Tx } from "./team-access.service";
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 
 export const INVITE_EXPIRY_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -33,6 +34,7 @@ export class TeamInvitesService {
     private readonly access: TeamAccessService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly plans: PlanAccessService,
   ) {}
 
   private get prisma() {
@@ -70,6 +72,7 @@ export class TeamInvitesService {
 
   async invite(ctx: ActorContext, dto: InviteMembersDto): Promise<TeamMemberView[]> {
     const emails = [...new Set(dto.emails)];
+    await this.plans.assertCanAdd(ctx.tenantId, "teamMembers", emails.length);
     const outgoing: OutgoingInvite[] = [];
 
     const created = await this.prisma.$transaction(async (tx) => {

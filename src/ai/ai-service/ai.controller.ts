@@ -1,3 +1,4 @@
+import { RequireFeature } from "../../plan-access/require-feature.guard";
 import {
   Controller,
   Post,
@@ -23,7 +24,9 @@ import {
   GenerateFlashcardsDto,
 } from "./dto/ai.dto";
 
+/** AI tools — every endpoint needs the plan's "AI assistant" feature. */
 @Controller("ai")
+@RequireFeature("aiAssistant")
 @UseGuards(AuthGuard("jwt"))
 export class AiController {
   constructor(private readonly aiService: AiService) {}

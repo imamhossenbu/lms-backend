@@ -1,3 +1,4 @@
+import { RequireFeature } from "../plan-access/require-feature.guard";
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
@@ -32,6 +33,7 @@ export class AdminCertificateTemplatesController {
     return this.query.template(user, id);
   }
 
+  @RequireFeature("certificates")
   @Post()
   @RequirePermission("certificates", "manage")
   @ApiOperation({ summary: "Create from the designer; ACTIVE templates take their courses from other active templates" })
@@ -46,6 +48,7 @@ export class AdminCertificateTemplatesController {
     return this.admin.update(user, id, dto);
   }
 
+  @RequireFeature("certificates")
   @Post(":id/duplicate")
   @RequirePermission("certificates", "manage")
   @ApiOperation({ summary: "Copy as a draft with no courses" })

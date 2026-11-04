@@ -11,6 +11,7 @@ import type { CreateInstructorDto, InstructorMessageDto, InstructorQueryDto, Upd
 import { INSTRUCTOR_ROLE, instructorStatusLabel, parseSkills, parseSocials, STATUS_FROM_LABEL, STATUSES_FOR_LABEL } from "../instructors.constants";
 import type { InstructorDetails, InstructorListItem, InstructorStatusLabel } from "../instructors.types";
 import { InstructorStatsService, type InstructorSummary } from "./instructor-stats.service";
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 
 type Tx = Prisma.TransactionClient;
 
@@ -23,6 +24,7 @@ export class InstructorsService {
     private readonly prisma: PrismaService,
     private readonly stats: InstructorStatsService,
     private readonly mail: MailService,
+    private readonly plans: PlanAccessService,
   ) {}
 
   /** Instructors visible to this admin: same tenant, not deleted. */
@@ -112,6 +114,7 @@ export class InstructorsService {
   }
 
   async create(actor: AuthUser, dto: CreateInstructorDto): Promise<InstructorDetails> {
+    await this.plans.assertCanAdd(actor.institutionId ?? null, "teamMembers");
     await assertEmailFree(this.prisma, dto.email);
     const password = generatePassword();
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);

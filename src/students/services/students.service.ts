@@ -11,6 +11,7 @@ import { STATUS_FROM_LABEL, STATUS_LABEL, STATUSES_FOR_LABEL, STUDENT_ROLE, stud
 import type { StudentDetails, StudentListItem, StudentStatusLabel } from "../students.types";
 import { StudentEnrollmentsService } from "./student-enrollments.service";
 import { StudentProgressService, type StudentSummary } from "./student-progress.service";
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 
 /** Admin panel › Students: list, details, create (with auto password + welcome email), edit, status, soft delete. */
 @Injectable()
@@ -22,6 +23,7 @@ export class StudentsService {
     private readonly progress: StudentProgressService,
     private readonly enrollments: StudentEnrollmentsService,
     private readonly mail: MailService,
+    private readonly plans: PlanAccessService,
   ) {}
 
   /** Students visible to this admin: same tenant, not deleted. */
@@ -95,6 +97,7 @@ export class StudentsService {
    * then emails the login details. Admin-created accounts are treated as email-verified.
    */
   async create(actor: AuthUser, dto: CreateStudentDto): Promise<StudentDetails> {
+    await this.plans.assertCanAdd(actor.institutionId ?? null, "students");
     await assertEmailFree(this.prisma, dto.email);
     const password = generatePassword();
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);

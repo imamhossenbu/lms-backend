@@ -10,6 +10,7 @@ import { scopeKeyOf, storedSecrets, toStore } from "../workspace-settings.mapper
 import { auditSummary, changedKeys, extractSecrets, humanize, isSecretPath, mergeSection, settingsRuleErrors } from "../workspace-settings.rules";
 import { INTEGRATION_KEYS, type IntegrationKey, type PlatformSettings, type SettingsAuditEntry, type SettingsSection, type SettingsStore } from "../workspace-settings.types";
 import { WorkspaceSettingsReader } from "./workspace-settings-reader.service";
+import { PlanAccessService } from "../../plan-access/plan-access.service";
 
 type Tx = Prisma.TransactionClient;
 const json = (v: unknown) => v as Prisma.InputJsonValue;
@@ -21,6 +22,7 @@ export class WorkspaceSettingsService {
     private readonly prisma: PrismaService,
     private readonly reader: WorkspaceSettingsReader,
     private readonly mail: MailService,
+    private readonly plans: PlanAccessService,
   ) {}
 
   async store(tenantId: string | null): Promise<SettingsStore> {
@@ -34,6 +36,7 @@ export class WorkspaceSettingsService {
     if (section === "security" && (values as PlatformSettings["security"]).requireAdmin2fa && !ctx.twoFactorEnabled && !ctx.member.isOwner)
       errors.push("Turn on two-factor authentication for your own account before requiring it for admins");
     if (errors.length) throw new BadRequestException(errors);
+    if (section === "branding" && (values as PlatformSettings["branding"]).showPoweredBy === false) await this.plans.assertFeature(ctx.tenantId, "whiteLabel");
 
     const defaults = await this.reader.defaults(ctx.tenantId);
     const row = await this.locked(ctx.tenantId, async (tx, cur) => {

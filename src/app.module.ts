@@ -42,6 +42,7 @@ import { InstructorsModule } from "./instructors/instructors.module";
 import { TeamModule } from "./team/team.module";
 import { OrdersModule } from "./orders/orders.module";
 import { HealthModule } from "./health/health.module";
+import { PlanAccessModule } from "./plan-access/plan-access.module";
 import { AssignmentsModule } from "./assignments/assignments.module";
 import { QuizzesModule } from "./quizzes/quizzes.module";
 import { LiveClassesModule } from "./live-classes/live-classes.module";
@@ -92,6 +93,7 @@ import { CertificatesModule } from "./certificates/certificates.module";
     TeamModule,
     OrdersModule,
     HealthModule,
+    PlanAccessModule,
     AssignmentsModule,
     QuizzesModule,
     LiveClassesModule,

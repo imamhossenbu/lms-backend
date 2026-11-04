@@ -1,3 +1,4 @@
+import { RequireFeature } from "../plan-access/require-feature.guard";
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, ValidateDto, type AuthUser } from "../common/auth-user";
@@ -84,6 +85,7 @@ export class AdminLiveClassesController {
     return this.query.activity(user, id, q);
   }
 
+  @RequireFeature("liveClasses")
   @Post()
   @RequirePermission("liveClasses", "manage")
   @ApiOperation({ summary: "Schedule a class (must start in the future)" })
@@ -106,6 +108,7 @@ export class AdminLiveClassesController {
     return this.admin.cancel(user, id);
   }
 
+  @RequireFeature("liveClasses")
   @Post(":id/restore")
   @HttpCode(200)
   @RequirePermission("liveClasses", "manage")
@@ -113,6 +116,7 @@ export class AdminLiveClassesController {
     return this.admin.restore(user, id);
   }
 
+  @RequireFeature("liveClasses")
   @Post(":id/duplicate")
   @RequirePermission("liveClasses", "manage")
   duplicate(@CurrentUser() user: AuthUser, @Uuid("id") id: string) {

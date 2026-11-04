@@ -5,6 +5,7 @@ import type { User } from "../../generated/prisma";
 import { BCRYPT_ROUNDS } from "../common/accounts";
 import { PrismaService } from "../prisma/prisma.service";
 import type { UpdateProfileDto } from "./dto/user.dto";
+import { PlanAccessService } from "../plan-access/plan-access.service";
 
 /** Learners and instructors — the only roles the legacy /user admin endpoints may touch. */
 const MANAGED_ROLES = ["STUDENT", "TEACHER"];
@@ -17,7 +18,10 @@ function safe(user: User) {
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private plans: PlanAccessService,
+  ) {}
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
@@ -55,7 +59,8 @@ export class UserService {
   }
 
   async changeUserRole(actor: { userId: string; institutionId?: string | null }, id: string, role: "STUDENT" | "TEACHER") {
-    await this.mustManaged(actor, id);
+    const user = await this.mustManaged(actor, id);
+    if (role === "TEACHER" && user.role !== "TEACHER") await this.plans.assertCanAdd(actor.institutionId ?? null, "teamMembers");
     return safe(await this.prisma.user.update({ where: { id }, data: { role } }));
   }
 
