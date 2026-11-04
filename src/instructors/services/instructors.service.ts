@@ -62,6 +62,8 @@ export class InstructorsService {
     const where: Prisma.UserWhereInput = {
       ...this.scope(actor),
       ...(query.status ? { status: { in: STATUSES_FOR_LABEL[query.status] } } : {}),
+      ...(query.expertise ? { expertise: { equals: query.expertise, mode: "insensitive" } } : {}),
+      ...(query.joinedWithinDays ? { createdAt: { gte: new Date(Date.now() - query.joinedWithinDays * 86_400_000) } } : {}),
       ...(query.q
         ? {
             OR: [
@@ -84,6 +86,12 @@ export class InstructorsService {
       total,
       query,
     );
+  }
+
+  /** Distinct expertise values in the workspace (for the list filter). */
+  async expertiseOptions(actor: AuthUser): Promise<string[]> {
+    const rows = await this.prisma.user.findMany({ where: { ...this.scope(actor), NOT: { expertise: null } }, select: { expertise: true }, distinct: ["expertise"], orderBy: { expertise: "asc" } });
+    return rows.map((r) => r.expertise!.trim()).filter(Boolean);
   }
 
   async detail(actor: AuthUser, id: string): Promise<InstructorDetails> {

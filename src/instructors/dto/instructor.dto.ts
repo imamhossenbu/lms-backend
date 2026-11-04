@@ -1,4 +1,4 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -35,6 +35,15 @@ export class InstructorQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(INSTRUCTOR_STATUS_LABELS, { message: "status must be Active or Inactive" })
   status?: InstructorStatusLabel;
+
+  /** Exact expertise (case-insensitive), e.g. "Web Development". */
+  @IsOptional() @trim() @IsString() @MaxLength(80) expertise?: string;
+
+  /** Only instructors who joined in the last 7, 30 or 90 days. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([7, 30, 90], { message: "joinedWithinDays must be 7, 30 or 90" })
+  joinedWithinDays?: 7 | 30 | 90;
 
   @IsOptional() @IsIn(["joinDate", "name"]) sortBy: "joinDate" | "name" = "joinDate";
   @IsOptional() @IsIn(["asc", "desc"]) sortOrder: "asc" | "desc" = "desc";

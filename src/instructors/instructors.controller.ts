@@ -30,6 +30,13 @@ export class InstructorsController {
     return this.instructors.list(user, query);
   }
 
+  @Get("expertise-options")
+  @ApiOperation({ summary: "Distinct expertise values in the workspace (list filter)" })
+  @RequirePermission("instructors", "view")
+  expertiseOptions(@CurrentUser() user: AuthUser) {
+    return this.instructors.expertiseOptions(user);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Instructor profile + teaching stats" })
   @RequirePermission("instructors", "view")
