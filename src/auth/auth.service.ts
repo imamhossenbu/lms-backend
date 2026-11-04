@@ -79,6 +79,7 @@ export class AuthService {
 
   // VERIFY EMAIL (Direct token query or link click)
   async verifyEmail(token: string) {
+    if (!token || typeof token !== "string") throw new BadRequestException("Verification token is missing");
     const user = await this.prisma.user.findUnique({
       where: {
         verificationToken: token,
@@ -89,16 +90,12 @@ export class AuthService {
       throw new NotFoundException("Invalid or expired verification token");
     }
 
-    return await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        emailVerified: true,
-        status: "ACTIVE",
-        verificationToken: null,
-      },
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, status: "ACTIVE", verificationToken: null },
     });
+    // Never echo the user row back (it holds the password hash).
+    return { message: "Email verified successfully. You can now sign in.", email: user.email };
   }
 
   // VERIFY 6-DIGIT CODE (From verify-email OTP frontend input)
