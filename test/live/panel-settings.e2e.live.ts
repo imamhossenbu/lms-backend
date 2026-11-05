@@ -98,6 +98,17 @@ const row = (institutionId: string) => p.workspaceSettings.findFirst({ where: { 
     check("another workspace doesn't get the secret hint", !(await text(o.page)).includes("9z8y"));
     await o.ctx.close();
 
+    // ---------------------------------------------------------------- 6b. maintenance › back up now
+    await page.goto(`${PANEL}/settings?section=maintenance`, { waitUntil: "networkidle2" });
+    await waitForText(page, "Stored backups");
+    await waitForText(page, "No backups yet");
+    await realClick(page, "button", "Back up now");
+    await waitForText(page, "Backup ready");
+    const backups = await until(() => p.workspaceBackup.count({ where: { institutionId: inst.id } }), (n: number) => n === 1);
+    const tBk = await text(page);
+    check("Back up now stores a backup and lists it", backups === 1 && tBk.includes("Manual") && tBk.includes("records"), { backups });
+    await page.screenshot({ path: `${SHOTS}/set-4-backups.png` });
+
     // ---------------------------------------------------------------- 7. idle session timeout → sign-in page
     // Activity is recorded at most once a minute; the open page's background inbox refresh (every 60 s) or the
     // next navigation then hits the timeout and the panel sends the admin to the sign-in page with the reason.
@@ -119,6 +130,7 @@ const row = (institutionId: string) => p.workspaceSettings.findFirst({ where: { 
     await browser.close();
     await cleanup(ids, tag, async () => {
       await p.workspaceSettings.deleteMany({ where: { institutionId: { in: ids.insts } } });
+      await p.workspaceBackup.deleteMany({ where: { institutionId: { in: ids.insts } } });
     });
     await report(tag, `, (select count(*)::int from workspace_settings where "institutionId" in (${ids.insts.map((i) => `'${i}'`).join(",") || "''"})) settings`);
   }

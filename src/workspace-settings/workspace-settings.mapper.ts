@@ -39,7 +39,7 @@ export function toStore(row: Row | null, defaults: PlatformSettings): SettingsSt
     settings: toSettings(row, defaults),
     secretHints: secretHints(storedSecrets(row)),
     audit: ((row?.audit ?? []) as unknown as SettingsAuditEntry[]).slice(),
-    // Backups are not run by the API yet (see the module doc).
+    // Kept for older panels; the list lives at GET /admin/settings/backups.
     backups: [],
     updatedAt: Object.fromEntries(SETTINGS_SECTIONS.map((s) => [s, updated[s] ?? ""])) as Record<SettingsSection, string>,
   };

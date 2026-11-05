@@ -36,6 +36,8 @@ export function buildCorsOptions(prisma: PrismaService, env: NodeJS.ProcessEnv =
 
   return {
     credentials: true,
+    // Download endpoints (e.g. backups) name their file in Content-Disposition.
+    exposedHeaders: ["Content-Disposition"],
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (explicit.has(origin) || subdomain.test(origin)) return callback(null, true);

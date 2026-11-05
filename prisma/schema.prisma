@@ -1783,3 +1783,23 @@ model OrderNote {
   @@index([orderId, scope, createdAt])
   @@map("order_notes")
 }
+
+/// Settings › Maintenance › Backups: a gzipped JSON snapshot of one workspace's data (passwords, secrets and
+/// tokens removed). AUTO = the nightly job, MANUAL = "Back up now". Deleted after `expiresAt` (retention).
+model WorkspaceBackup {
+  id            String   @id @default(uuid())
+  /// Tenant (null = legacy single-tenant workspace).
+  institutionId String?
+  kind          String
+  /// gzip(JSON) — never selected by default (global omit in PrismaService).
+  data          Bytes
+  sizeBytes     Int
+  /// Rows per table, e.g. { "Course": 12, "User": 340 }.
+  tableCounts   Json     @default("{}")
+  createdByName String   @default("")
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+
+  @@index([institutionId, createdAt])
+  @@map("workspace_backups")
+}

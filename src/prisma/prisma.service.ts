@@ -45,7 +45,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       transactionOptions: { maxWait: 10_000, timeout: 15_000 },
       // Lesson editor data (notes, quiz answers…) is staff-only: never returned unless a query opts in with
       // `omit: { editorSettings: false }` (LessonService.findOne for ADMIN / TEACHER).
-      omit: { lesson: { editorSettings: true } },
+      // Backup files are only read by the download endpoint (`omit: { data: false }`).
+      omit: { lesson: { editorSettings: true }, workspaceBackup: { data: true } },
     });
 
     this.pool = pool;

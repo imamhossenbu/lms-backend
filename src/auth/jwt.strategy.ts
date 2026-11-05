@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { jwtSecret } from "../common/env";
@@ -22,6 +22,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.role === "ADMIN" && !payload.impersonatedBy && payload.sub) {
       const active = await this.securityPolicy.touchAdminSession(payload.sub, payload.institutionId ?? null);
       if (!active) throw new UnauthorizedException("You were signed out after a period of inactivity. Please sign in again.");
+    }
+    // Settings › Maintenance › Maintenance mode.
+    if (payload.role !== "SUPER_ADMIN" && !payload.impersonatedBy && payload.sub) {
+      const blocked = await this.securityPolicy.maintenanceBlock(payload.sub, payload.role, payload.institutionId ?? null);
+      if (blocked) throw new ServiceUnavailableException({ statusCode: 503, code: "MAINTENANCE", message: blocked });
     }
     return {
       userId: payload.sub,

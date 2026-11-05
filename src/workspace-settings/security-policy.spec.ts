@@ -1,4 +1,4 @@
-import { adminIpAllowed, afterFailedLogin, ipInList, isIdleExpired, isPasswordExpired, lockMinutesLeft, normalizeIp, passwordPolicyErrors } from "./security-policy";
+import { adminIpAllowed, afterFailedLogin, ipInList, isIdleExpired, isPasswordExpired, lockMinutesLeft, maintenanceActive, normalizeIp, passwordPolicyErrors } from "./security-policy";
 
 const NOW = new Date("2026-11-05T10:00:00Z");
 const policy = { passwordMinLength: 10, requireUppercase: true, requireNumber: true, requireSymbol: true };
@@ -47,5 +47,19 @@ describe("Settings › Security enforcement (pure rules)", () => {
     expect(isIdleExpired(new Date(NOW.getTime() - 121 * 60_000), 120, NOW)).toBe(true);
     expect(isIdleExpired(new Date(NOW.getTime() - 119 * 60_000), 120, NOW)).toBe(false);
     expect(isIdleExpired(null, 120, NOW)).toBe(false);
+  });
+});
+
+describe("maintenanceActive", () => {
+  const at = new Date("2026-11-05T10:00:00Z"); // 16:00 in Dhaka
+  it("off, on without an end, and ended / not ended", () => {
+    expect(maintenanceActive({ maintenanceMode: false, maintenanceUntil: "" }, at)).toBe(false);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "" }, at)).toBe(true);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "2026-11-05T09:00:00Z" }, at)).toBe(false);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "2026-11-05T11:00:00+00:00" }, at)).toBe(true);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "2026-11-05T15:00" }, at)).toBe(false);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "2026-11-05T17:00" }, at)).toBe(true);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "2026-11-05" }, at)).toBe(true);
+    expect(maintenanceActive({ maintenanceMode: true, maintenanceUntil: "2026-11-04" }, at)).toBe(false);
   });
 });

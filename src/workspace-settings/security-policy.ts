@@ -3,6 +3,7 @@
  * strategy: password policy, password expiry, login lockout, admin IP allowlist and the admin idle timeout.
  */
 import type { SecuritySettings } from "./workspace-settings.types";
+import { localToInstant } from "../common/workspace-time";
 
 const SYMBOL_RE = /[^A-Za-z0-9]/;
 
@@ -74,6 +75,23 @@ export function ipInList(ip: string | null | undefined, list: string[]): boolean
 export function adminIpAllowed(ip: string | null | undefined, s: Pick<SecuritySettings, "ipAllowlistEnabled" | "ipAllowlist">): boolean {
   if (!s.ipAllowlistEnabled || s.ipAllowlist.length === 0) return true;
   return ipInList(ip, s.ipAllowlist);
+}
+
+/**
+ * Is maintenance mode on right now? `maintenanceUntil` (optional) ends it: an ISO instant, or a workspace-local
+ * "YYYY-MM-DD" / "YYYY-MM-DDTHH:mm" (UTC+6).
+ */
+export function maintenanceActive(m: { maintenanceMode: boolean; maintenanceUntil: string }, now = new Date()): boolean {
+  if (!m.maintenanceMode) return false;
+  const until = (m.maintenanceUntil ?? "").trim();
+  if (!until) return true;
+  let end: Date | null;
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(until)) end = new Date(until);
+  else {
+    const [date, time] = until.split("T");
+    end = localToInstant(date, (time ?? "23:59").slice(0, 5));
+  }
+  return !end || Number.isNaN(end.getTime()) || end > now;
 }
 
 /** Has an admin been idle longer than the session timeout? (no activity recorded yet = not idle) */

@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
@@ -277,6 +278,12 @@ export class AuthService {
     // Settings › Security › IP allowlist: admin sign-ins only from the listed networks.
     if (user.role === "ADMIN" && !adminIpAllowed(ip, security)) {
       throw new ForbiddenException("Sign-ins from your network aren't allowed for this workspace. Ask the workspace owner to add your IP address.");
+    }
+
+    // Settings › Maintenance › Maintenance mode (the owner, and admins when allowed, can still sign in).
+    if (user.role !== "SUPER_ADMIN") {
+      const blocked = await this.securityPolicy.maintenanceBlock(user.id, user.role, user.institutionId ?? null);
+      if (blocked) throw new ServiceUnavailableException({ statusCode: 503, code: "MAINTENANCE", message: blocked });
     }
 
     // Settings › Security › Password expiry.

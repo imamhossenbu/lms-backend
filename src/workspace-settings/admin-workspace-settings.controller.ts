@@ -1,5 +1,5 @@
-import { Body, Controller, createParamDecorator, ExecutionContext, Get, HttpCode, Param, Patch, Post, Req } from "@nestjs/common";
-import type { Request } from "express";
+import { Body, Controller, createParamDecorator, Delete, ExecutionContext, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Req, Res } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { RequireRoles, ValidateDto } from "../common/auth-user";
 import { AllowPendingTwoFactor, RequirePermission } from "../team/permissions.guard";
@@ -17,6 +17,7 @@ import {
   TestEmailDto,
 } from "./dto/workspace-settings.dto";
 import { WorkspaceSettingsService } from "./services/workspace-settings.service";
+import { WorkspaceBackupsService } from "./backups/workspace-backups.service";
 
 /** Staff context resolved by PermissionsGuard. */
 const Actor = createParamDecorator((_: unknown, ctx: ExecutionContext): ActorContext => ctx.switchToHttp().getRequest().teamAccess);
@@ -30,7 +31,45 @@ const Actor = createParamDecorator((_: unknown, ctx: ExecutionContext): ActorCon
 @RequireRoles("ADMIN")
 @ValidateDto()
 export class AdminWorkspaceSettingsController {
-  constructor(private readonly settings: WorkspaceSettingsService) {}
+  constructor(
+    private readonly settings: WorkspaceSettingsService,
+    private readonly backups: WorkspaceBackupsService,
+  ) {}
+
+  // ---------------------------------------------------------------- Maintenance › Backups
+
+  @Get("backups")
+  @RequirePermission("settings", "view")
+  @ApiOperation({ summary: "Backups of this workspace, newest first (no file data)" })
+  listBackups(@Actor() ctx: ActorContext) {
+    return this.backups.list(ctx.tenantId);
+  }
+
+  @Post("backups")
+  @RequirePermission("settings", "manage")
+  @ApiOperation({ summary: "Back up now: snapshot the workspace's data (gzipped JSON; passwords, secrets and tokens removed)" })
+  createBackup(@Actor() ctx: ActorContext) {
+    return this.backups.create(ctx.tenantId, "MANUAL", ctx.name);
+  }
+
+  @Get("backups/:id/download")
+  @RequirePermission("settings", "manage")
+  @ApiOperation({ summary: "Download one backup (.json.gz)" })
+  async downloadBackup(@Actor() ctx: ActorContext, @Param("id", ParseUUIDPipe) id: string, @Res() res: Response) {
+    const file = await this.backups.download(ctx.tenantId, id);
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", `attachment; filename="${file.filename}"`);
+    res.setHeader("Content-Length", String(file.data.length));
+    res.end(file.data);
+  }
+
+  @Delete("backups/:id")
+  @HttpCode(204)
+  @RequirePermission("settings", "manage")
+  @ApiOperation({ summary: "Delete one backup" })
+  async deleteBackup(@Actor() ctx: ActorContext, @Param("id", ParseUUIDPipe) id: string) {
+    await this.backups.remove(ctx.tenantId, id);
+  }
 
   @Get()
   @RequirePermission("settings", "view")

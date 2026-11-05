@@ -3,8 +3,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { mergeSection } from "./workspace-settings.rules";
 import { scopeKeyOf } from "./workspace-settings.mapper";
-import type { SecuritySettings } from "./workspace-settings.types";
-import { isIdleExpired, passwordPolicyErrors } from "./security-policy";
+import type { MaintenanceSettings, SecuritySettings } from "./workspace-settings.types";
+import { isIdleExpired, maintenanceActive, passwordPolicyErrors } from "./security-policy";
 
 const CACHE_MS = 30_000;
 /** lastActiveAt is written at most this often per user. */
@@ -17,6 +17,8 @@ const TOUCH_EVERY_MS = 60_000;
 @Injectable()
 export class SecurityPolicyService {
   private readonly cache = new Map<string, { at: number; value: SecuritySettings }>();
+  private readonly maintenanceCache = new Map<string, { at: number; value: MaintenanceSettings }>();
+  private readonly ownerCache = new Map<string, { at: number; value: boolean }>();
   private readonly touched = new Map<string, number>();
 
   constructor(private readonly prisma: PrismaService) {}
@@ -31,9 +33,40 @@ export class SecurityPolicyService {
     return value;
   }
 
-  /** Call after Settings › Security is saved so the new rules apply right away. */
+  /** Call after Settings › Security / Maintenance is saved so the new rules apply right away. */
   forget(tenantId: string | null) {
     this.cache.delete(scopeKeyOf(tenantId));
+    this.maintenanceCache.delete(scopeKeyOf(tenantId));
+  }
+
+  async maintenance(tenantId: string | null): Promise<MaintenanceSettings> {
+    const key = scopeKeyOf(tenantId);
+    const hit = this.maintenanceCache.get(key);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+    const row = await this.prisma.workspaceSettings.findUnique({ where: { scopeKey: key }, select: { maintenance: true } });
+    const value = mergeSection("maintenance", row?.maintenance ?? null);
+    this.maintenanceCache.set(key, { at: Date.now(), value });
+    return value;
+  }
+
+  /**
+   * Settings › Maintenance › Maintenance mode: the message to refuse `role` with, or null when allowed.
+   * Students / teachers are kept out; admins too unless "Allow admins" is on — except the workspace owner,
+   * so someone can always switch it off. Platform owner (SUPER_ADMIN) and impersonation aren't checked here.
+   */
+  async maintenanceBlock(userId: string, role: string, tenantId: string | null): Promise<string | null> {
+    const m = await this.maintenance(tenantId);
+    if (!maintenanceActive(m)) return null;
+    if (role === "ADMIN" && (m.allowAdminsDuringMaintenance || (await this.isOwner(userId)))) return null;
+    return m.maintenanceMessage?.trim() || "We're doing some maintenance. Please check back soon.";
+  }
+
+  private async isOwner(userId: string): Promise<boolean> {
+    const hit = this.ownerCache.get(userId);
+    if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+    const value = !!(await this.prisma.teamMember.findFirst({ where: { userId, isOwner: true }, select: { id: true } }));
+    this.ownerCache.set(userId, { at: Date.now(), value });
+    return value;
   }
 
   /** 400 with the policy's reasons when `password` doesn't meet the workspace's password policy. */

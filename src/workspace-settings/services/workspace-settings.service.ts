@@ -56,7 +56,7 @@ export class WorkspaceSettingsService {
         },
       });
     });
-    if (section === "security") this.securityPolicy.forget(ctx.tenantId);
+    if (section === "security" || section === "maintenance") this.securityPolicy.forget(ctx.tenantId);
     return toStore(row, defaults);
   }
 
