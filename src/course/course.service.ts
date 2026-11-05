@@ -127,7 +127,8 @@ export class CourseService {
     };
   }
 
-  async findOne(id: string, tenantId: string | null) {
+  /** `staff` (ADMIN / TEACHER) also sees hidden lesson resources. */
+  async findOne(id: string, tenantId: string | null, staff = false) {
     const course = await this.prisma.course.findFirst({
       where: { id, institutionId: tenantId },
       include: {
@@ -138,7 +139,7 @@ export class CourseService {
             lessons: {
               orderBy: { order: "asc" },
               include: {
-                lessonResources: true,
+                lessonResources: { where: staff ? {} : { isVisible: true }, orderBy: { order: "asc" } },
               },
             },
           },

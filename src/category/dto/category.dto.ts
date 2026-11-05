@@ -1,9 +1,11 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from "class-validator";
 import { Transform } from "class-transformer";
 
 const STATUSES = ["ACTIVE", "INACTIVE"] as const;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const trim = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim() : value);
+/** "" / "null" (multipart) → null = top level. */
+const toParent = ({ value }: { value: unknown }) => (value === "" || value === "null" ? null : value);
 
 export class CreateCategoryDto {
   @Transform(trim)
@@ -34,6 +36,13 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: string;
+
+  /** Parent category id (null / "" = top level). Sub-categories are one level deep. */
+  @IsOptional()
+  @Transform(toParent)
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID("all", { message: "Parent category is invalid." })
+  parentId?: string | null;
 }
 
 export class UpdateCategoryDto {
@@ -64,4 +73,11 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: string;
+
+  /** Parent category id (null / "" = top level). Sub-categories are one level deep. */
+  @IsOptional()
+  @Transform(toParent)
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID("all", { message: "Parent category is invalid." })
+  parentId?: string | null;
 }

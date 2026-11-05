@@ -84,10 +84,16 @@ model Category {
   description String?
   icon        String?
   status      String
+  /// Parent category (null = top level). One level deep: a sub-category can't have children.
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    Category[] @relation("CategoryTree")
+  createdAt   DateTime   @default(now())
   courses     Course[]
 
   @@unique([institutionId, slug])
   @@index([institutionId])
+  @@index([parentId])
 }
 
 model Course {
@@ -161,6 +167,9 @@ model Lesson {
   isPreview       Boolean          @default(false)
   resources       String?
   status          String
+  /// Lesson editor fields without their own column (short description, visibility, publish date, thumbnail,
+  /// player options, poster, subtitles, behaviour, access, drip, SEO, quiz, notes), in the panel's shape.
+  editorSettings  Json?
   lessonResources LessonResource[]
   progress        LessonProgress[]
 }
@@ -174,6 +183,11 @@ model LessonResource {
   fileType       String
   size           String
   isDownloadable Boolean @default(true)
+  description    String  @default("")
+  /// Position in the lesson's resource list (0-based).
+  order          Int     @default(0)
+  /// Hidden resources stay on the lesson but aren't shown to students.
+  isVisible      Boolean @default(true)
 }
 
 model Enrollment {

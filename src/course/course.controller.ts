@@ -84,7 +84,8 @@ export class CourseController {
   @Get(":id")
   @UseGuards(OptionalJwtGuard)
   async getOne(@Param("id") id: string, @Query("institution") institution: string | undefined, @Req() req: Partial<RequestWithUser>) {
-    return this.courseService.findOne(id, await resolvePublicTenant(this.prisma, req.user as any, institution));
+    const staff = req.user?.role === "ADMIN" || req.user?.role === "TEACHER";
+    return this.courseService.findOne(id, await resolvePublicTenant(this.prisma, req.user as any, institution), staff);
   }
 
   @StaffPermission("courses", "manage")

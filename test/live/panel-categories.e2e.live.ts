@@ -1,7 +1,8 @@
 /**
  * Browser E2E for the admin panel Categories against the real API: list from the API (no mock categories) with
- * course counts, zod validation, create in the drawer (slug follows the name), edit, delete refused while courses
- * use the category, delete of an empty one, URL-kept drawer across reload and workspace isolation.
+ * course counts, zod validation, create in the drawer (slug follows the name), edit, sub-categories (parent picker,
+ * shown under the parent, parent can't be deleted while it has one), created date, delete refused while courses use
+ * the category, delete of an empty one, URL-kept drawer across reload and workspace isolation.
  * Panel on :3010, API on :4077 by default. Cleanup in `finally`.
  */
 import { PANEL, SHOTS, check, cleanup, dumpPages, fill, launch, login, mkCourse, mkInstitution, mkUser, newTag, prisma as p, realClick, report, result, sleep, text, until, waitForNoText, waitForText, type Ids } from "./panel-e2e-helpers";
@@ -63,6 +64,45 @@ const tag = newTag();
     const renamed = await until(() => p.category.findUnique({ where: { id: created.id } }), (c: any) => c?.name === `Renamed Cat ${tag}`);
     check("edit saved via the API", renamed?.name === `Renamed Cat ${tag}`, renamed);
     await waitForText(page, `Renamed Cat ${tag}`);
+
+    // ---------------------------------------------------------------- 4b. sub-category
+    await page.goto(`${PANEL}/categories?drawer=new`, { waitUntil: "networkidle2" });
+    await page.waitForSelector("#cat-name");
+    await fill(page, "#cat-name", `Child Cat ${tag}`);
+    await realClick(page, 'button[aria-haspopup="listbox"]', "None (top-level category)");
+    await page.waitForSelector('[role="option"]', { timeout: 10000 });
+    await realClick(page, '[role="option"]', `Renamed Cat ${tag}`, true);
+    await sleep(300);
+    await realClick(page, 'button[type="submit"]', "Create Category");
+    const child = await until(() => p.category.findFirst({ where: { institutionId: inst.id, name: `Child Cat ${tag}` } }), (c: any) => !!c);
+    check("sub-category saved with its parent via the API", child?.parentId === created.id, child);
+    await waitForText(page, "Category created");
+    await page.goto(`${PANEL}/categories`, { waitUntil: "networkidle2" });
+    await waitForText(page, `Child Cat ${tag}`);
+    const rows = await page.$$eval("tbody tr", (trs) => trs.map((tr) => (tr as HTMLElement).innerText));
+    const iParent = rows.findIndex((r) => r.includes(`Renamed Cat ${tag}`));
+    const iChild = rows.findIndex((r) => r.includes(`Child Cat ${tag}`));
+    check("sub-category is listed right under its parent", iParent >= 0 && iChild === iParent + 1 && rows[iChild].includes(`in Renamed Cat ${tag}`) && rows[iParent].includes("1 sub-category"), { iParent, iChild });
+    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    check("created date comes from the API", rows[iChild]?.includes(today), { row: rows[iChild], today });
+    await page.screenshot({ path: `${SHOTS}/cat-3-subcategory.png` });
+    // A parent with a sub-category can't be deleted.
+    await page.goto(`${PANEL}/categories?drawer=${created.id}`, { waitUntil: "networkidle2" });
+    await waitForText(page, "Sub-categories (1)");
+    check("details drawer lists the sub-category", (await text(page)).includes(`Child Cat ${tag}`));
+    await page.goto(`${PANEL}/categories`, { waitUntil: "networkidle2" });
+    await waitForText(page, `Renamed Cat ${tag}`);
+    await page.click(`button[aria-label='Delete category "Renamed Cat ${tag}"']`);
+    await realClick(page, "button", "Delete Category", true);
+    await waitForText(page, "Couldn't delete the category");
+    check("parent with a sub-category can't be deleted", !!(await p.category.findUnique({ where: { id: created.id } })));
+    // Delete the sub-category, then the parent can go (step 6).
+    await page.goto(`${PANEL}/categories`, { waitUntil: "networkidle2" });
+    await waitForText(page, `Child Cat ${tag}`);
+    await page.click(`button[aria-label='Delete category "Child Cat ${tag}"']`);
+    await realClick(page, "button", "Delete Category", true);
+    const childGone = await until(() => p.category.findUnique({ where: { id: child.id } }), (c) => !c);
+    check("sub-category deleted via the API", !childGone);
 
     // ---------------------------------------------------------------- 5. delete refused while in use
     await page.goto(`${PANEL}/categories`, { waitUntil: "networkidle2" });

@@ -1,9 +1,14 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "../../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+
+/** Upper bound for Lesson.editorSettings (JSON characters). */
+const MAX_EDITOR_SETTINGS = 200_000;
 import { CreateLessonDto, UpdateLessonDto } from "./dto/lesson.dto";
 import { DurationService } from "../Duration/duration.service";
 import { EnrollmentService } from "../enrollment/enrollment.service";
@@ -33,9 +38,12 @@ export class LessonService {
   }
 
   async findOne(userId: string, role: string, lessonId: string) {
+    const staff = role === "ADMIN" || role === "TEACHER";
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
-      include: { lessonResources: true },
+      include: { lessonResources: { where: staff ? {} : { isVisible: true }, orderBy: { order: "asc" } } },
+      // Editor-only data (notes, quiz answers…) goes to staff only.
+      omit: { editorSettings: !staff },
     });
     if (!lesson) throw new NotFoundException("Lesson not found");
 
@@ -64,9 +72,12 @@ export class LessonService {
       if (!target) throw new NotFoundException("Target module not found in this course");
     }
 
+    if (dto.editorSettings !== undefined && JSON.stringify(dto.editorSettings).length > MAX_EDITOR_SETTINGS)
+      throw new BadRequestException("The lesson's editor settings are too large. Shorten the notes or SEO texts and try again.");
+    const { editorSettings, ...fields } = dto;
     const updatedLesson = await this.prisma.lesson.update({
       where: { id },
-      data: dto,
+      data: { ...fields, ...(editorSettings !== undefined && { editorSettings: editorSettings as Prisma.InputJsonValue }) },
     });
 
     await this.durationService.updateDurations(lesson.courseId, lesson.moduleId);

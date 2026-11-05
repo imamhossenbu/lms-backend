@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsBoolean,
   IsOptional,
+  IsObject,
 } from "class-validator";
 
 export class CreateLessonDto {
@@ -33,4 +34,9 @@ export class UpdateLessonDto {
   @IsOptional() @IsString() resources?: string;
   /** Moves the lesson to another module of the SAME course (checked in LessonService.update). */
   @IsOptional() @IsUUID("all", { message: "moduleId must be a valid id" }) moduleId?: string;
+  /**
+   * Lesson editor fields without their own column (access, drip, SEO, quiz, notes, player options…), stored as
+   * JSON in the panel's shape and returned to staff only. Replaces the stored object.
+   */
+  @IsOptional() @IsObject({ message: "editorSettings must be an object" }) editorSettings?: Record<string, unknown>;
 }

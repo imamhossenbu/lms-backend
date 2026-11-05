@@ -1,5 +1,5 @@
-import { ToBoolean } from "../../common/transforms";
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
+import { ToBoolean, ToNumber } from "../../common/transforms";
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Max, MaxLength, Min } from "class-validator";
 
 /**
  * A lesson resource. Send a multipart `file` (uploaded to Cloudinary; fileUrl / fileType / size are then taken
@@ -14,6 +14,11 @@ export class CreateLessonResourceDto {
   /** e.g. "2.45 MB". */
   @IsOptional() @IsString() @MaxLength(40) size?: string;
   @ToBoolean() @IsBoolean() @IsOptional() isDownloadable?: boolean;
+  @IsOptional() @IsString() @MaxLength(500) description?: string;
+  /** Position in the lesson's resource list (0-based). */
+  @IsOptional() @ToNumber() @IsInt() @Min(0) @Max(999) order?: number;
+  /** Hidden resources aren't shown to students. */
+  @ToBoolean() @IsBoolean() @IsOptional() isVisible?: boolean;
 }
 
 export class UpdateLessonResourceDto {
@@ -22,4 +27,9 @@ export class UpdateLessonResourceDto {
   @IsOptional() @IsString() @MaxLength(100) fileType?: string;
   @IsOptional() @IsString() @MaxLength(40) size?: string;
   @ToBoolean() @IsBoolean() @IsOptional() isDownloadable?: boolean;
+  @IsOptional() @IsString() @MaxLength(500) description?: string;
+  /** Position in the lesson's resource list (0-based). */
+  @IsOptional() @ToNumber() @IsInt() @Min(0) @Max(999) order?: number;
+  /** Hidden resources aren't shown to students. */
+  @ToBoolean() @IsBoolean() @IsOptional() isVisible?: boolean;
 }

@@ -30,6 +30,9 @@ export class LessonResourceService {
           size: dto.size || "",
           lessonId,
           isDownloadable: dto.isDownloadable !== false,
+          description: dto.description ?? "",
+          order: dto.order ?? 0,
+          isVisible: dto.isVisible !== false,
         },
       });
     }
@@ -56,13 +59,18 @@ export class LessonResourceService {
         size: (file.size / 1024 / 1024).toFixed(2) + " MB",
         lessonId,
         isDownloadable: String(dto.isDownloadable) !== "false",
+        description: dto.description ?? "",
+        order: dto.order ?? 0,
+        isVisible: dto.isVisible !== false,
       },
     });
   }
 
-  async findAllByLesson(lessonId: string) {
+  /** Students only get visible resources; `staff` (ADMIN / TEACHER) gets all of them. */
+  async findAllByLesson(lessonId: string, staff = false) {
     return await this.prisma.lessonResource.findMany({
-      where: { lessonId },
+      where: { lessonId, ...(staff ? {} : { isVisible: true }) },
+      orderBy: { order: "asc" },
     });
   }
 

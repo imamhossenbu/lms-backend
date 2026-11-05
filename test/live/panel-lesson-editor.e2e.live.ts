@@ -2,11 +2,17 @@
  * Browser E2E for the admin panel Lesson editor (/courses/:id/lessons/:lessonId/edit) against the real API:
  * loads the real lesson + course curriculum, zod validation, Content save (title / duration), Media video URL with
  * `?tab=` kept across reloads, Settings free preview, Resources (existing one listed, new external link saved),
- * moving the lesson to another module and workspace isolation. Panel on :3010, API on :4077 by default.
+ * resource description / visibility / order, editor settings (SEO) on the server — read back in a fresh browser,
+ * staff-only for the API — moving the lesson to another module and workspace isolation. Panel on :3010, API on :4077 by default.
  */
 import { PANEL, SHOTS, check, cleanup, dumpPages, fill, launch, login, mkCourse, mkInstitution, mkUser, newTag, pick, prisma as p, realClick, report, result, sleep, text, until, waitForText, type Ids } from "./panel-e2e-helpers";
 
 const tag = newTag();
+const API = process.env.LIVE_API_URL ?? "http://localhost:4077";
+async function api(token: string | null, method: string, path: string, body?: unknown) {
+  const res = await fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  return { status: res.status, body: (await res.json().catch(() => null)) as any };
+}
 const lessonRow = (id: string) => p.lesson.findUnique({ where: { id }, include: { lessonResources: true } });
 
 (async () => {
@@ -24,6 +30,8 @@ const lessonRow = (id: string) => p.lesson.findUnique({ where: { id }, include: 
       data: { courseId: course.id, moduleId: modA.id, title: `Lesson One ${tag}`, type: "TEXT", content: "<p>Old body</p>", durationMinutes: 10, order: 1, status: "DRAFT" },
     });
     await p.lessonResource.create({ data: { lessonId: lesson.id, title: `Old Sheet ${tag}`, fileUrl: "https://example.com/old.pdf", fileType: "PDF", size: "1 MB" } });
+    const student = await mkUser(ids, tag, "Lesson Student", "STUDENT", inst.id);
+    await p.enrollment.create({ data: { userId: student.id, courseId: course.id, status: "ACTIVE" } });
     const foreignCourse = await mkCourse(other.id, `Foreign Course ${tag}`, otherAdmin.id);
     const fMod = await p.courseModule.create({ data: { courseId: foreignCourse.id, title: "Foreign Module", order: 1 } });
     const foreignLesson = await p.lesson.create({ data: { courseId: foreignCourse.id, moduleId: fMod.id, title: `Foreign Lesson ${tag}`, type: "TEXT", durationMinutes: 5, order: 1, status: "DRAFT" } });
@@ -97,14 +105,46 @@ const lessonRow = (id: string) => p.lesson.findUnique({ where: { id }, include: 
     await page.waitForSelector("#resource-url");
     await fill(page, "#resource-title", `Guide Link ${tag}`);
     await fill(page, "#resource-url", "https://example.com/e2e-guide");
+    await fill(page, "#resource-description", "Read this before the lesson");
     await realClick(page, "button", "Add Resource", true);
     await waitForText(page, `Guide Link ${tag}`);
+    await page.click(`button[aria-label^="Old Sheet ${tag} is visible"]`);
     await save();
-    const l6 = await until(() => lessonRow(lesson.id), (l: any) => l?.lessonResources?.length === 2);
+    const l6 = await until(() => lessonRow(lesson.id), (l: any) => l?.lessonResources?.length === 2 && l.lessonResources.some((r: any) => !r.isVisible));
     const link = l6?.lessonResources?.find((r: any) => r.title === `Guide Link ${tag}`);
+    const old = l6?.lessonResources?.find((r: any) => r.title === `Old Sheet ${tag}`);
     check("new link resource saved via the API", !!link && link.fileUrl === "https://example.com/e2e-guide", l6?.lessonResources);
+    check("resource description, visibility and order saved", link?.description === "Read this before the lesson" && old?.isVisible === false && old?.order === 0 && link?.order === 1, l6?.lessonResources?.map((r: any) => ({ t: r.title, d: r.description, v: r.isVisible, o: r.order })));
     await waitForText(page, "Lesson updated");
     await page.screenshot({ path: `${SHOTS}/lesson-2-resources.png` });
+
+    // ---------------------------------------------------------------- 6b. editor settings on the server (SEO)
+    await page.goto(url("?tab=seo"), { waitUntil: "networkidle2" });
+    await page.waitForSelector("#seo-title", { timeout: 30000 });
+    const seoTitle = `SEO Title ${tag}`;
+    await fill(page, "#seo-title", seoTitle);
+    await save();
+    const l6b = await until(() => p.lesson.findUnique({ where: { id: lesson.id }, omit: { editorSettings: false } }), (l: any) => l?.editorSettings?.seo?.title === seoTitle);
+    check("editor settings (SEO) saved on the server", (l6b as any)?.editorSettings?.seo?.title === seoTitle, (l6b as any)?.editorSettings?.seo);
+    await waitForText(page, "Lesson updated");
+    // A fresh browser profile has no local draft: the value must come from the API.
+    const fresh = await login(browser, admin.email);
+    await fresh.page.goto(url("?tab=seo"), { waitUntil: "networkidle2" });
+    await fresh.page.waitForSelector("#seo-title", { timeout: 30000 });
+    const freshSeo = await until(() => fresh.page.$eval("#seo-title", (e) => (e as HTMLInputElement).value), (v) => v === seoTitle);
+    const freshTab = await fresh.page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("edupro_lesson_editor")).length);
+    check("another browser reads the editor settings from the API", freshSeo === seoTitle && freshTab === 0, { freshSeo, freshTab });
+    await fresh.ctx.close();
+    const st = await api(null, "POST", "/auth/login", { email: student.email, password: "Admin12345" });
+    const asStudent = await api(st.body?.token, "GET", `/courses/${course.id}/modules/${modA.id}/lessons/${lesson.id}`);
+    check(
+      "students get neither editor settings nor hidden resources",
+      asStudent.status === 200 && !("editorSettings" in (asStudent.body ?? {})) && (asStudent.body?.lessonResources ?? []).every((r: any) => r.title !== `Old Sheet ${tag}`) && (asStudent.body?.lessonResources ?? []).length === 1,
+      { status: asStudent.status, keys: Object.keys(asStudent.body ?? {}), res: asStudent.body?.lessonResources?.map((r: any) => r.title) },
+    );
+    const pub = await api(null, "GET", `/courses/${course.id}?institution=${inst.slug}`);
+    const pubLessons = (pub.body?.modules ?? []).flatMap((m: any) => m.lessons ?? []);
+    check("public course detail hides editor settings and hidden resources", pub.status === 200 && pubLessons.length > 0 && pubLessons.every((l: any) => !("editorSettings" in l) && (l.lessonResources ?? []).every((r: any) => r.isVisible !== false)), { status: pub.status, n: pubLessons.length });
 
     // ---------------------------------------------------------------- 7. move to another module
     await page.goto(url(), { waitUntil: "networkidle2" });

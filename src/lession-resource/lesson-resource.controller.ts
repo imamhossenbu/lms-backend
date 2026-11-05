@@ -10,6 +10,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Req,
   UseInterceptors,
   UploadedFile,
   ParseFilePipe,
@@ -21,6 +22,7 @@ import { CreateLessonResourceDto, UpdateLessonResourceDto } from "./dto/resource
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import type { RequestWithUser } from "../auth/interfaces/request.interface";
 
 @Controller("lessons/:lessonId/resources")
 @ValidateDto()
@@ -48,8 +50,8 @@ export class LessonResourceController {
   }
 
   @Get()
-  async findAll(@Param("lessonId") lessonId: string) {
-    return this.resourceService.findAllByLesson(lessonId);
+  async findAll(@Param("lessonId") lessonId: string, @Req() req: RequestWithUser) {
+    return this.resourceService.findAllByLesson(lessonId, req.user.role === "ADMIN" || req.user.role === "TEACHER");
   }
   @StaffPermission("courses", "manage")
   @Patch(":id")

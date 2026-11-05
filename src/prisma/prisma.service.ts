@@ -43,6 +43,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // Interactive transactions need a fresh pooled connection; after idle sockets are dropped (15s) Neon can take
       // longer than Prisma's 2s default to hand one out (P2028 "Unable to start a transaction in the given time").
       transactionOptions: { maxWait: 10_000, timeout: 15_000 },
+      // Lesson editor data (notes, quiz answers…) is staff-only: never returned unless a query opts in with
+      // `omit: { editorSettings: false }` (LessonService.findOne for ADMIN / TEACHER).
+      omit: { lesson: { editorSettings: true } },
     });
 
     this.pool = pool;
