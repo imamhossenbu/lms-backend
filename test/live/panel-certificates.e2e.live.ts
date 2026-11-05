@@ -94,6 +94,8 @@ async function pick(page: Page, placeholder: string, option: string) {
     await fill(page, "#password-field", "Admin12345");
     await page.click('button[type="submit"]');
     await page.waitForFunction(() => location.pathname === "/", { timeout: 25000 });
+    const listRequests: string[] = [];
+    page.on("request", (r) => listRequests.push(r.url()));
 
     // ---------------------------------------------------------------- 1. list (empty workspace, no mock data)
     await page.goto(`${PANEL}/certificates`, { waitUntil: "networkidle2" });
@@ -101,6 +103,10 @@ async function pick(page: Page, placeholder: string, option: string) {
     await sleep(1200);
     const t0 = await text(page);
     check("certificates list loads from the API (no mock certificates / courses)", !t0.includes("HTML Fundamentals") && !t0.includes("EDU-HF-") && !t0.includes("Sarah Rahman"), t0.slice(0, 300));
+    {
+      const pageReqs = listRequests.filter((u) => /\/admin\/certificates\?/.test(u) && !/\/(stats|activity|eligible|learners|export)\b/.test(u));
+      check("the certificates list asks the API for one page (page + limit)", pageReqs.length > 0 && pageReqs.every((u) => /[?&]page=\d+/.test(u) && /[?&]limit=\d+/.test(u) && !/limit=100\b/.test(u)), pageReqs.slice(0, 3));
+    }
 
     // ---------------------------------------------------------------- 2. template designer on the real course
     await page.goto(`${PANEL}/certificates/templates/new`, { waitUntil: "networkidle2" });

@@ -228,8 +228,10 @@ export class AssignmentQueryDto extends PaginationQueryDto {
   /** Only this course's assignments (the Course › Assignments tab). */
   @IsOptional() @IsUUID("all", { message: "courseId must be a valid id" }) courseId?: string;
   @IsOptional() @IsUUID("all", { message: "moduleId must be a valid id" }) moduleId?: string;
-  /** Searches the title. */
+  /** Searches the title and the course title. */
   @IsOptional() @trim() @IsString() @MaxLength(100) q?: string;
+  /** List tab: pending = has submissions waiting for a grade, graded = published with submissions all graded, drafts. */
+  @IsOptional() @IsIn(["all", "pending", "graded", "drafts"]) tab?: "all" | "pending" | "graded" | "drafts";
   @IsOptional() @IsIn(ASSIGNMENT_STATUSES) status?: AssignmentStatus;
   @IsOptional() @IsIn(ASSIGNMENT_TYPES) type?: AssignmentType;
   @IsOptional() @IsIn(["dueDate", "createdAt", "title"]) sortBy: "dueDate" | "createdAt" | "title" = "createdAt";
