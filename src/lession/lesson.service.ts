@@ -12,6 +12,8 @@ const MAX_EDITOR_SETTINGS = 200_000;
 import { CreateLessonDto, UpdateLessonDto } from "./dto/lesson.dto";
 import { DurationService } from "../Duration/duration.service";
 import { EnrollmentService } from "../enrollment/enrollment.service";
+import { LessonAccessService } from "./lesson-access.service";
+import { outlineOnly } from "./lesson-gate";
 
 @Injectable()
 export class LessonService {
@@ -19,6 +21,7 @@ export class LessonService {
     private prisma: PrismaService,
     private durationService: DurationService,
     private enrollmentService: EnrollmentService,
+    private lessonAccess: LessonAccessService,
   ) {}
 
   async create(courseId: string, moduleId: string, dto: CreateLessonDto) {
@@ -30,15 +33,19 @@ export class LessonService {
     return lesson;
   }
 
-  async findAllByModule(moduleId: string) {
-    return await this.prisma.lesson.findMany({
+  /** Non-staff get the outline only (content / video through GET lesson). */
+  async findAllByModule(moduleId: string, staff = true) {
+    const lessons = await this.prisma.lesson.findMany({
       where: { moduleId },
       orderBy: { order: "asc" },
     });
+    return staff ? lessons : lessons.map(outlineOnly);
   }
 
-  async findOne(userId: string, role: string, lessonId: string) {
+  /** Students go through the lesson's publish / access / drip rules (LessonAccessService). */
+  async findOne(userId: string, role: string, lessonId: string, country: string | null = null) {
     const staff = role === "ADMIN" || role === "TEACHER";
+    if (!staff) await this.lessonAccess.assert(userId, role, lessonId, country);
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { lessonResources: { where: staff ? {} : { isVisible: true }, orderBy: { order: "asc" } } },
@@ -98,7 +105,7 @@ export class LessonService {
     return deletedLesson;
   }
 
-  async completeLesson(userId: string, lessonId: string) {
+  async completeLesson(userId: string, lessonId: string, role = "STUDENT", country: string | null = null) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
     });
@@ -113,6 +120,8 @@ export class LessonService {
         "You must be enrolled to complete this lesson",
       );
     }
+    // A lesson that's still locked for this student can't be completed.
+    await this.lessonAccess.assert(userId, role, lessonId, country);
 
     await this.prisma.lessonProgress.upsert({
       where: { userId_lessonId: { userId, lessonId } },

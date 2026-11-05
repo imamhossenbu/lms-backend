@@ -10,6 +10,7 @@ import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
 import { CourseQueryDto } from "./dto/course-query.dto";
 import { assertSlugFree, findCategoryInTenant, findCourseInTenant } from "../common/tenancy";
 import { PlanAccessService } from "../plan-access/plan-access.service";
+import { outlineOnly } from "../lession/lesson-gate";
 
 @Injectable()
 export class CourseService {
@@ -147,7 +148,9 @@ export class CourseService {
       },
     });
     if (!course) throw new NotFoundException("Course not found");
-    return course;
+    if (staff) return course;
+    // Visitors and students get the curriculum outline; lesson content goes through GET lesson (gated).
+    return { ...course, modules: course.modules.map((m) => ({ ...m, lessons: m.lessons.map(outlineOnly) })) };
   }
 
   async update(

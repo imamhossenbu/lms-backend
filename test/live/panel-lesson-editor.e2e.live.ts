@@ -27,7 +27,7 @@ const lessonRow = (id: string) => p.lesson.findUnique({ where: { id }, include: 
     const modA = await p.courseModule.create({ data: { courseId: course.id, title: `Module Alpha ${tag}`, order: 1 } });
     const modB = await p.courseModule.create({ data: { courseId: course.id, title: `Module Beta ${tag}`, order: 2 } });
     const lesson = await p.lesson.create({
-      data: { courseId: course.id, moduleId: modA.id, title: `Lesson One ${tag}`, type: "TEXT", content: "<p>Old body</p>", durationMinutes: 10, order: 1, status: "DRAFT" },
+      data: { courseId: course.id, moduleId: modA.id, title: `Lesson One ${tag}`, type: "TEXT", content: "<p>Old body</p>", durationMinutes: 10, order: 1, status: "PUBLISHED" },
     });
     await p.lessonResource.create({ data: { lessonId: lesson.id, title: `Old Sheet ${tag}`, fileUrl: "https://example.com/old.pdf", fileType: "PDF", size: "1 MB" } });
     const student = await mkUser(ids, tag, "Lesson Student", "STUDENT", inst.id);

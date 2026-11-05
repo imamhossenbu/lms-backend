@@ -30,6 +30,7 @@ import { ActivityLogModule } from "./activity-log/activity-log.module";
 import { SettingsModule } from "./settings/settings.module";
 import { WorkspaceSettingsModule } from "./workspace-settings/workspace-settings.module";
 import { SecurityPolicyModule } from "./workspace-settings/security-policy.service";
+import { LessonAccessModule } from "./lession/lesson-access.service";
 import { AiSettingsModule } from "./ai/ai-settings/ai-settings.module";
 import { AiModule } from "./ai/ai-service/ai.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
@@ -100,6 +101,7 @@ import { CertificatesModule } from "./certificates/certificates.module";
     LiveClassesModule,
     WorkspaceSettingsModule,
     SecurityPolicyModule,
+    LessonAccessModule,
     NotificationsModule,
     CertificatesModule,
   ],

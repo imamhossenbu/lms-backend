@@ -7,6 +7,7 @@ import { gradeAttempt, missingRequired } from "../quizzes/quiz-grading";
 import { toQuizItem, type QuizWithQuestions } from "../quizzes/quiz.mapper";
 import type { QuizItem } from "../quizzes/quizzes.types";
 import { withQuestions } from "../quizzes/services/quizzes-query.service";
+import { LessonAccessService } from "../lession/lesson-access.service";
 
 /** A quiz as a student may see it before submitting: no correct answers, accepted answers or explanations. */
 function forStudent(q: QuizItem) {
@@ -39,7 +40,15 @@ function forStudent(q: QuizItem) {
 
 @Injectable()
 export class QuizService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly lessonAccess: LessonAccessService,
+  ) {}
+
+  /** A lesson's quiz follows the lesson's publish / access / drip rules. */
+  private async assertLessonOpen(user: AuthUser, quiz: { lessonId: string }) {
+    if (quiz.lessonId) await this.lessonAccess.assert(user.userId, user.role, quiz.lessonId, null);
+  }
 
   /** Enrolled students only, unless the quiz is open to all students of the workspace. */
   private async assertAccess(user: AuthUser, quiz: Pick<QuizWithQuestions, "courseId" | "access" | "institutionId">) {
@@ -53,6 +62,7 @@ export class QuizService {
     const quiz = await this.prisma.quiz.findUnique({ where: { id }, include: withQuestions });
     if (!quiz || quiz.status !== "PUBLISHED") throw new NotFoundException("Quiz not found");
     await this.assertAccess(user, quiz);
+    await this.assertLessonOpen(user, quiz);
     return quiz;
   }
 
@@ -60,13 +70,16 @@ export class QuizService {
     const now = new Date();
     const quizzes = await this.prisma.quiz.findMany({ where: { courseId, status: "PUBLISHED" }, include: withQuestions, orderBy: { createdAt: "asc" } });
     if (quizzes[0]) await this.assertAccess(user, quizzes[0]);
-    return quizzes.filter((q) => !quizClosedReason(q, now)).map((q) => forStudent(toQuizItem(q)));
+    // Quizzes of lessons the student can't open yet stay out of the list.
+    const open = await Promise.all(quizzes.map(async (q) => !q.lessonId || !!(await this.lessonAccess.check(user.userId, user.role, q.lessonId, null))?.allowed));
+    return quizzes.filter((q, i) => open[i] && !quizClosedReason(q, now)).map((q) => forStudent(toQuizItem(q)));
   }
 
   async forLesson(user: AuthUser, lessonId: string) {
     const quiz = await this.prisma.quiz.findFirst({ where: { lessonId, status: "PUBLISHED" }, include: withQuestions });
     if (!quiz) return null;
     await this.assertAccess(user, quiz);
+    await this.assertLessonOpen(user, quiz);
     return forStudent(toQuizItem(quiz));
   }
 

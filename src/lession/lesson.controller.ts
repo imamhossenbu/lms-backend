@@ -17,6 +17,7 @@ import { CreateLessonDto, UpdateLessonDto } from "./dto/lesson.dto";
 import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { requestCountry } from "./lesson-access.service";
 
 @Controller("courses/:courseId/modules/:moduleId/lessons")
 @ValidateDto()
@@ -37,13 +38,13 @@ export class LessonController {
   }
 
   @Get()
-  async findAll(@Param("moduleId") moduleId: string) {
-    return this.lessonService.findAllByModule(moduleId);
+  async findAll(@Param("moduleId") moduleId: string, @Req() req: any) {
+    return this.lessonService.findAllByModule(moduleId, req.user.role === "ADMIN" || req.user.role === "TEACHER");
   }
 
   @Get(":id")
   async findOne(@Req() req: any, @Param("id") id: string) {
-    return this.lessonService.findOne(req.user.userId, req.user.role, id);
+    return this.lessonService.findOne(req.user.userId, req.user.role, id, requestCountry(req));
   }
 
   @StaffPermission("courses", "manage")
@@ -64,6 +65,6 @@ export class LessonController {
   @Roles("STUDENT", "ADMIN")
   async complete(@Req() req: any, @Param("id") lessonId: string) {
     const userId = req.user.userId;
-    return await this.lessonService.completeLesson(userId, lessonId);
+    return await this.lessonService.completeLesson(userId, lessonId, req.user.role, requestCountry(req));
   }
 }

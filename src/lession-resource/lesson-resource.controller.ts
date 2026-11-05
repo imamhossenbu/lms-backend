@@ -23,13 +23,16 @@ import { AuthGuard } from "@nestjs/passport";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { RequestWithUser } from "../auth/interfaces/request.interface";
+import { LessonAccessService, requestCountry } from "../lession/lesson-access.service";
 
 @Controller("lessons/:lessonId/resources")
 @ValidateDto()
 @UseGuards(AuthGuard("jwt"), RolesGuard, CatalogAccessGuard)
 @CatalogId("resource")
 export class LessonResourceController {
-  constructor(private readonly resourceService: LessonResourceService) {}
+  constructor(private readonly resourceService: LessonResourceService,
+    private readonly lessonAccess: LessonAccessService,
+  ) {}
 
   @StaffPermission("courses", "manage")
   @Post()
@@ -51,7 +54,10 @@ export class LessonResourceController {
 
   @Get()
   async findAll(@Param("lessonId") lessonId: string, @Req() req: RequestWithUser) {
-    return this.resourceService.findAllByLesson(lessonId, req.user.role === "ADMIN" || req.user.role === "TEACHER");
+    const staff = req.user.role === "ADMIN" || req.user.role === "TEACHER";
+    // Students only see the resources of lessons they may open.
+    if (!staff) await this.lessonAccess.assert(req.user.userId, req.user.role, lessonId, requestCountry(req));
+    return this.resourceService.findAllByLesson(lessonId, staff);
   }
   @StaffPermission("courses", "manage")
   @Patch(":id")
