@@ -118,6 +118,13 @@ const lessonRow = (id: string) => p.lesson.findUnique({ where: { id }, include: 
     await waitForText(page, "Lesson updated");
     await page.screenshot({ path: `${SHOTS}/lesson-2-resources.png` });
 
+    // ---------------------------------------------------------------- 6a. access tab: real options only
+    await page.goto(url("?tab=access"), { waitUntil: "networkidle2" });
+    await waitForText(page, "Geographic Restriction");
+    const tAccess = await text(page);
+    check("access tab has no mock group / plan options", !tAccess.includes("Access by User Groups") && !tAccess.includes("Subscription & Plan Access") && !tAccess.includes("Premium Members"), tAccess.slice(0, 200));
+    await page.screenshot({ path: `${SHOTS}/lesson-3-access.png` });
+
     // ---------------------------------------------------------------- 6b. editor settings on the server (SEO)
     await page.goto(url("?tab=seo"), { waitUntil: "networkidle2" });
     await page.waitForSelector("#seo-title", { timeout: 30000 });
