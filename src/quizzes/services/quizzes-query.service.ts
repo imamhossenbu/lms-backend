@@ -33,6 +33,7 @@ export class QuizzesQueryService {
       ...this.scope(actor),
       ...(q.courseId && { courseId: q.courseId }),
       ...(q.moduleId && { moduleId: q.moduleId }),
+      ...(q.lessonId && { lessonId: q.lessonId }),
       ...(q.status && { status: q.status }),
       ...(q.difficulty && { difficulty: q.difficulty }),
       ...(q.q && { title: { contains: q.q, mode: "insensitive" as const } }),

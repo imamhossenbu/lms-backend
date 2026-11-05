@@ -14,6 +14,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { PaginationQueryDto } from "../../common/pagination";
@@ -63,7 +64,10 @@ export class CreateQuizDto {
   title!: string;
 
   @IsUUID("all", { message: "Select a course" }) courseId!: string;
-  @IsUUID("all", { message: "Select a module" }) moduleId!: string;
+  /** Not needed with `lessonId`: the lesson's module is used. */
+  @ValidateIf((o: CreateQuizDto) => !o.lessonId) @IsUUID("all", { message: "Select a module" }) moduleId!: string;
+  /** Attaches the quiz to a lesson of the course (one quiz per lesson). */
+  @IsOptional() @IsUUID("all", { message: "lessonId must be a valid id" }) lessonId?: string;
   @IsIn(QUIZ_DIFFICULTIES) difficulty!: QuizDifficulty;
 
   @PlainTextLength(L.descriptionMin, L.descriptionMax, `Description must be at least ${L.descriptionMin} characters`, `Description must be ${L.descriptionMax} characters or less`)
@@ -105,6 +109,7 @@ export class UpdateQuizDto extends PartialType(OmitType(CreateQuizDto, ["status"
 export class QuizQueryDto extends PaginationQueryDto {
   @IsOptional() @IsUUID("all", { message: "courseId must be a valid id" }) courseId?: string;
   @IsOptional() @IsUUID("all", { message: "moduleId must be a valid id" }) moduleId?: string;
+  @IsOptional() @IsUUID("all", { message: "lessonId must be a valid id" }) lessonId?: string;
   /** Searches the title. */
   @IsOptional() @trim() @IsString() @MaxLength(100) q?: string;
   @IsOptional() @IsIn(QUIZ_STATUSES) status?: QuizStatus;

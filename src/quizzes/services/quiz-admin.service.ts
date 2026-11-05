@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import type { Prisma, QuizEventKind } from "../../../generated/prisma";
 import type { AuthUser } from "../../common/auth-user";
@@ -31,12 +31,13 @@ export class QuizAdminService {
 
   async create(user: AuthUser, dto: CreateQuizDto): Promise<QuizItem> {
     const actor = await this.actor(user);
-    const { status = "PUBLISHED", ...rest } = dto;
+    const { status = "PUBLISHED", lessonId, ...rest } = dto;
+    if (lessonId) rest.moduleId = await this.lessonModule(lessonId, rest.courseId);
     const fields = this.normalize(rest);
     await this.assertValid(tenantOf(user), fields, status);
     const id = await this.prisma.$transaction(async (tx) => {
       const quiz = await tx.quiz.create({
-        data: { ...toQuizData(fields), status, institutionId: actor.institutionId ?? null, createdById: actor.userId, createdByName: actor.name },
+        data: { ...toQuizData(fields), lessonId: lessonId ?? "", status, institutionId: actor.institutionId ?? null, createdById: actor.userId, createdByName: actor.name },
       });
       await this.writeQuestions(tx, quiz.id, fields.questions);
       await this.log(tx, quiz.id, actor, "CREATED", `created the quiz "${fields.title}" with ${plural(fields.questions.length, "question")}`);
@@ -49,8 +50,11 @@ export class QuizAdminService {
   async update(user: AuthUser, id: string, dto: UpdateQuizDto): Promise<QuizItem> {
     const actor = await this.actor(user);
     const current = toQuizItem(await this.query.mustFind(actor, id));
-    const { status, ...patch } = dto;
+    const { status, lessonId, ...patch } = dto;
     if (patch.courseId && patch.courseId !== current.courseId) throw new BadRequestException("A quiz can't be moved to another course.");
+    // A lesson quiz follows its lesson's module (lessons can move between modules).
+    const nextLessonId = lessonId ?? current.lessonId;
+    if (nextLessonId) patch.moduleId = await this.lessonModule(nextLessonId, current.courseId, id);
     const merged = this.normalize({
       ...fieldsOf(current),
       ...patch,
@@ -60,7 +64,7 @@ export class QuizAdminService {
     await this.assertValid(tenantOf(user), merged, nextStatus, { module: patch.moduleId !== undefined });
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.quiz.update({ where: { id }, data: { ...toQuizData(merged), status: nextStatus } });
+      await tx.quiz.update({ where: { id }, data: { ...toQuizData(merged), ...(lessonId !== undefined && { lessonId }), status: nextStatus } });
       if (patch.questions) await this.writeQuestions(tx, id, merged.questions);
 
       if (status && status !== current.status) await this.log(tx, id, actor, STATUS_EVENT[status].kind, STATUS_EVENT[status].message);
@@ -132,6 +136,15 @@ export class QuizAdminService {
 
   private normalize(f: QuizFields): QuizFields {
     return { ...f, timeLimitMinutes: f.timeLimitMinutes ?? null };
+  }
+
+  /** Module of a lesson of `courseId` that has no other quiz yet (one quiz per lesson). */
+  private async lessonModule(lessonId: string, courseId: string, quizId?: string): Promise<string> {
+    const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, courseId }, select: { moduleId: true } });
+    if (!lesson) throw new BadRequestException("Select a lesson from this course");
+    const other = await this.prisma.quiz.findFirst({ where: { lessonId, ...(quizId && { id: { not: quizId } }) }, select: { id: true } });
+    if (other) throw new ConflictException("This lesson already has a quiz. Edit that one instead.");
+    return lesson.moduleId;
   }
 
   private async assertValid(tenantId: string | null, f: QuizFields, status: QuizStatus, check = { module: true }) {

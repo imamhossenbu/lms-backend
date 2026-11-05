@@ -85,6 +85,7 @@ export function toQuizItem(q: QuizWithQuestions): QuizItem {
     instructionsHtml: q.instructionsHtml,
     courseId: q.courseId,
     moduleId: q.moduleId ?? "",
+    lessonId: q.lessonId ?? "",
     difficulty: q.difficulty as QuizDifficulty,
     questions: [...q.questions].sort((a, b) => a.order - b.order).map(toQuestion),
     passingMarks: q.passingScore,

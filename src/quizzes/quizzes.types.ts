@@ -52,6 +52,8 @@ export interface QuizFields {
 
 export interface QuizItem extends QuizFields {
   id: string;
+  /** Lesson this quiz belongs to (course builder "Quiz" lessons); "" for a stand-alone quiz. */
+  lessonId: string;
   status: QuizStatus;
   createdBy: string;
   createdAt: string;
