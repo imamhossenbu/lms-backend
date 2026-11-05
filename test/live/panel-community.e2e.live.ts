@@ -101,6 +101,8 @@ async function pick(page: Page, placeholder: string, option: string) {
     await fill(page, "#password-field", "Admin12345");
     await page.click('button[type="submit"]');
     await page.waitForFunction(() => location.pathname === "/", { timeout: 25000 });
+    const listRequests: string[] = [];
+    page.on("request", (r) => listRequests.push(r.url()));
 
     // ---------------------------------------------------------------- 1. list + stats + moderation queue
     await page.goto(`${PANEL}/community`, { waitUntil: "networkidle2" });
@@ -108,6 +110,10 @@ async function pick(page: Page, placeholder: string, option: string) {
     await sleep(800);
     const t1 = await text(page);
     check("list shows this workspace's discussion from the API (no mock / foreign threads)", !t1.includes(`Foreign thread ${tag}`) && !t1.includes("flexbox layout overflow on mobile?\n") && t1.includes(`Forum Course ${tag}`), t1.slice(0, 300));
+    {
+      const pageReqs = listRequests.filter((u) => /\/admin\/community\/threads\?/.test(u) && !/\/(stats|activity|eligible|learners|export)\b/.test(u));
+      check("the discussions list asks the API for one page (page + limit)", pageReqs.length > 0 && pageReqs.every((u) => /[?&]page=\d+/.test(u) && /[?&]limit=\d+/.test(u) && !/limit=100\b/.test(u)), pageReqs.slice(0, 3));
+    }
     const queue = await page.evaluate(() => [...document.querySelectorAll("section, div")].map((e) => (e as HTMLElement).innerText).find((s) => s.startsWith("Moderation Queue")) ?? "");
     check("moderation queue (API) lists the reported discussion", queue.includes(`Why does my grid overflow ${tag}`) && queue.includes("Off-topic"), queue.slice(0, 200));
     await page.screenshot({ path: `${SHOTS}/community-1-list.png` });

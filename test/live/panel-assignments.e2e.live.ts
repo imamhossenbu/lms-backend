@@ -98,12 +98,18 @@ async function pick(page: Page, placeholder: string, option: string) {
     await fill(page, "#password-field", "Admin12345");
     await page.click('button[type="submit"]');
     await page.waitForFunction(() => location.pathname === "/", { timeout: 25000 });
+    const listRequests: string[] = [];
+    page.on("request", (r) => listRequests.push(r.url()));
 
     // ---------------------------------------------------------------- 1. list from the API
     await page.goto(`${PANEL}/assignments`, { waitUntil: "networkidle2" });
     await waitForText(page, "Total Assignments");
     const t0 = await text(page);
     check("assignments list loads from the API (no mock rows / other workspace)", !t0.includes("HTML Fundamentals") && !t0.includes(`Foreign ${tag}`), t0.slice(0, 300));
+    {
+      const pageReqs = listRequests.filter((u) => /\/admin\/assignments\?/.test(u) && !/\/(stats|activity|eligible|learners|export)\b/.test(u));
+      check("the assignments list asks the API for one page (page + limit)", pageReqs.length > 0 && pageReqs.every((u) => /[?&]page=\d+/.test(u) && /[?&]limit=\d+/.test(u) && !/limit=100\b/.test(u)), pageReqs.slice(0, 3));
+    }
 
     // ---------------------------------------------------------------- 2. create through the wizard on a real course
     await page.goto(`${PANEL}/assignments/create?course=${course.id}`, { waitUntil: "networkidle2" });

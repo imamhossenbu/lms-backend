@@ -60,7 +60,10 @@ export class AssignmentsQueryService {
       ...(q.moduleId && { moduleId: q.moduleId }),
       ...(q.status && { status: q.status }),
       ...(q.type && { type: q.type }),
-      ...(q.q && { title: { contains: q.q, mode: "insensitive" as const } }),
+      ...(q.q && { OR: [{ title: { contains: q.q, mode: "insensitive" as const } }, { course: { title: { contains: q.q, mode: "insensitive" as const } } }] }),
+      ...(q.tab === "pending" && { submissions: { some: { status: "PENDING" } } }),
+      ...(q.tab === "graded" && { status: "PUBLISHED", submissions: { some: {}, none: { status: "PENDING" } } }),
+      ...(q.tab === "drafts" && { status: "DRAFT" }),
     };
     const orderBy: Prisma.AssignmentOrderByWithRelationInput = { [q.sortBy === "title" ? "title" : q.sortBy]: q.sortOrder };
     const [rows, total] = await Promise.all([
