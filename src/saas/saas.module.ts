@@ -2,6 +2,9 @@ import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { MailService } from "../auth/mail/mail.service";
 import { MarketingLeadsService } from "./leads/marketing-leads.service";
+import { PlatformStatsService } from "./leads/platform-stats.service";
+import { TestimonialsService } from "./testimonials/testimonials.service";
+import { OwnerTestimonialsController } from "./testimonials/owner-testimonials.controller";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { OwnerAlertsController } from "./alerts/owner-alerts.controller";
@@ -43,6 +46,7 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     JwtModule.register({ secret: process.env.SUPER_SECRET_KEY, signOptions: { expiresIn: "1d" } }),
   ],
   controllers: [
+    OwnerTestimonialsController,
     SaasPublicController,
     OwnerPlansController,
     OwnerInstitutionsController,
@@ -63,6 +67,8 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     SaasLifecycleService,
     MailService,
     MarketingLeadsService,
+    PlatformStatsService,
+    TestimonialsService,
     ConsoleSettingsReader,
     ConsoleSettingsService,
     CouponsService,

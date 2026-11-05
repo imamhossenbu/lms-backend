@@ -11,6 +11,8 @@ import { SaasPlansService } from "../services/saas-plans.service";
 import { SaasValidation } from "./saas-controller.utils";
 import { ContactRequestDto } from "../leads/contact.dto";
 import { MarketingLeadsService } from "../leads/marketing-leads.service";
+import { PlatformStatsService } from "../leads/platform-stats.service";
+import { TestimonialsService } from "../testimonials/testimonials.service";
 
 /** Unauthenticated endpoints for the public pricing + /signup pages. */
 @ApiTags("SaaS · Public")
@@ -22,7 +24,23 @@ export class SaasPublicController {
     private readonly institutions: SaasInstitutionsService,
     private readonly coupons: CouponRedemptionsService,
     private readonly leads: MarketingLeadsService,
+    private readonly platformStats: PlatformStatsService,
+    private readonly testimonials: TestimonialsService,
   ) {}
+
+  @Get("testimonials")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: "Published testimonials for the marketing website (owner-managed), in order" })
+  publishedTestimonials() {
+    return this.testimonials.published();
+  }
+
+  @Get("stats")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: "Real platform-wide counts for the marketing website (active institutions, students, live classes, published courses); cached 10 min" })
+  stats() {
+    return this.platformStats.stats();
+  }
 
   @Post("contact")
   @HttpCode(201)

@@ -23,6 +23,18 @@ const tag = newTag();
     const t0 = await text(page);
     check("home renders the hero and features", t0.includes("Run your whole academy") && t0.includes("Live classes") && t0.includes("Certificates"));
     check("home shows the live plans from the API", plans.every((pl) => t0.includes(pl.name)) && t0.includes(`$${plans[0].priceMonthly}`), plans.map((x) => x.name));
+    const stats = (await (await fetch(`${API}/saas/public/stats`)).json()) as Record<string, number>;
+    for (let y = 0; y <= 6000; y += 400) {
+      await page.evaluate((v) => window.scrollTo(0, v), y);
+      await sleep(80);
+    }
+    await sleep(2200);
+    const tStats = await text(page);
+    check(
+      "stats strip shows the real platform numbers",
+      ["Institutions", "Students", "Live classes", "Published courses"].every((l) => tStats.includes(l)) && tStats.includes(String(stats.institutions)) && tStats.includes(String(stats.students)),
+      stats,
+    );
     await page.screenshot({ path: `${SHOTS}/site-1-home.png`, fullPage: true });
 
     // ---------------------------------------------------------------- pricing

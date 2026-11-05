@@ -1824,3 +1824,24 @@ model MarketingLead {
   @@index([createdAt])
   @@map("marketing_leads")
 }
+
+/// Marketing website › testimonials, managed by the platform owner in the Owner Console. Only published
+/// ones are served (GET /saas/public/testimonials), in `order`.
+model Testimonial {
+  id           String   @id @default(uuid())
+  quote        String
+  name         String
+  /// e.g. "Director, LearnZone Academy".
+  role         String   @default("")
+  /// Optional photo URL (uploaded via the console); initials are shown without one.
+  avatarUrl    String   @default("")
+  isPublished  Boolean  @default(false)
+  /// Shown as the highlighted (orange) card.
+  featured     Boolean  @default(false)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isPublished, order])
+  @@map("testimonials")
+}
