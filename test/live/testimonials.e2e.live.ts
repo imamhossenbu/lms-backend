@@ -132,7 +132,8 @@ async function rowMenu(page: Page, name: string, item: string) {
     check("swiping the track moves to the next testimonials", swiped !== startDot && swiped >= 0, { startDot, swiped });
     await site.click('button[aria-label="Previous testimonials"]');
     await sleep(700);
-    check("arrows slide back", (await activeDot()) === (swiped + 3) % 4, await activeDot());
+    const dots = await site.$$eval('button[aria-label^="Show testimonial "]', (b) => b.length);
+    check("arrows slide back", (await activeDot()) === (swiped + dots - 1) % dots, await activeDot());
     // The orange card is the middle one of the three in view.
     const mid = await site.evaluate(() => {
       const track = document.querySelector('[aria-roledescription="carousel"]')!.getBoundingClientRect();
