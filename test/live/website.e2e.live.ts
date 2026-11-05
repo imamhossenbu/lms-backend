@@ -49,7 +49,7 @@ const tag = newTag();
     const trialY = await page.$$eval("a", (as) => as.map((a) => (a as HTMLAnchorElement).href).filter((h) => h.includes("/signup?plan=")));
     check("yearly toggle shows yearly prices and links", t1.includes(yearlyMonthly) && t1.includes(`$${first.priceYearly.toLocaleString("en-US")} billed yearly`) && trialY.every((h) => h.includes("cycle=YEARLY")), { yearlyMonthly });
     const rows = await page.$$eval("table tbody tr", (trs) => trs.length);
-    check("comparison table lists limits and features", rows >= 6 && t1.includes("Compare every plan"), rows);
+    check("comparison table lists limits and features", rows >= 6 && t1.includes("Every limit and feature"), rows);
     await page.screenshot({ path: `${SHOTS}/site-2-pricing.png`, fullPage: true });
 
     // ---------------------------------------------------------------- features + anchors
