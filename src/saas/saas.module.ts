@@ -5,6 +5,9 @@ import { MarketingLeadsService } from "./leads/marketing-leads.service";
 import { PlatformStatsService } from "./leads/platform-stats.service";
 import { TestimonialsService } from "./testimonials/testimonials.service";
 import { OwnerTestimonialsController } from "./testimonials/owner-testimonials.controller";
+import { BlogService } from "./blog/blog.service";
+import { OwnerBlogController } from "./blog/owner-blog.controller";
+import { PublicBlogController } from "./blog/public-blog.controller";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { OwnerAlertsController } from "./alerts/owner-alerts.controller";
@@ -47,6 +50,8 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
   ],
   controllers: [
     OwnerTestimonialsController,
+    OwnerBlogController,
+    PublicBlogController,
     SaasPublicController,
     OwnerPlansController,
     OwnerInstitutionsController,
@@ -69,6 +74,7 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     MarketingLeadsService,
     PlatformStatsService,
     TestimonialsService,
+    BlogService,
     ConsoleSettingsReader,
     ConsoleSettingsService,
     CouponsService,

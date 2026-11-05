@@ -1845,3 +1845,35 @@ model Testimonial {
   @@index([isPublished, order])
   @@map("testimonials")
 }
+
+/// Marketing website blog post, written by the platform owner in the Owner Console › Blog.
+model BlogPost {
+  id              String    @id @default(uuid())
+  /// URL part: /blog/{slug}. Unique, lowercase, hyphenated.
+  slug            String    @unique
+  title           String
+  /// One or two sentences for cards and search results.
+  excerpt         String
+  /// Article body in Markdown (headings, lists, links, images, quotes, code).
+  content         String
+  /// Optional cover image (https); the website draws a branded cover without one.
+  coverUrl        String    @default("")
+  category        String    @default("Guides")
+  tags            String[]  @default([])
+  authorName      String    @default("EduPro Team")
+  authorRole      String    @default("")
+  authorAvatarUrl String    @default("")
+  /// Estimated from the word count on save.
+  readMinutes     Int       @default(1)
+  isPublished     Boolean   @default(false)
+  /// Shown as the large post at the top of /blog.
+  featured        Boolean   @default(false)
+  /// Set the first time the post is published.
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isPublished, publishedAt])
+  @@index([category])
+  @@map("blog_posts")
+}
