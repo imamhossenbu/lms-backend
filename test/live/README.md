@@ -23,6 +23,11 @@ dev database. These are not Jest tests and are not part of `npm test`.
 | `panel-certificates.e2e.live.ts` | Browser test of the panel Certificates: list from the API, template designer on a real course, eligible queue + Issue to all, manual issue (learner picker from the API), revoke / restore, verify, isolation |
 | `panel-community.e2e.live.ts` | Browser test of the panel Community: list + moderation queue from the API, New Discussion on a real course / module, view count, reply as the admin, accept answer, pin, resolve report, delete, isolation |
 | `panel-live-classes.e2e.live.ts` | Browser test of the panel Live Classes: list from the API, schedule form on a real course + instructor, details / invited students, attendance override, Q&A answer, add resource, duplicate, cancel / restore, delete, isolation |
+| `panel-e2e-helpers.ts` | Shared helpers for the four suites below (checks, waits, Radix-safe clicks, tagged workspace + admin, cleanup) |
+| `panel-notifications.e2e.live.ts` | Browser test of the panel Notifications: inbox + bell count from the API, mark read / archive, compose with the API recipient estimate → Send Now (only this workspace's students), Broadcasts tab across reloads, detail, Save as Draft, template on/off, isolation |
+| `panel-settings.e2e.live.ts` | Browser test of the panel Settings: General save (validation, reload, audit), `?section=` across reloads, Stripe secret write-only (encrypted at rest, masked hint), gateway Test connection, isolation |
+| `panel-categories.e2e.live.ts` | Browser test of the panel Categories: list from the API, zod validation, create (slug follows name), edit drawer across reloads, delete refused while in use, delete, isolation |
+| `panel-lesson-editor.e2e.live.ts` | Browser test of the panel Lesson editor: real lesson + curriculum, validation, title / duration, video URL (`?tab=` across reloads), free preview, resources (existing + new link), move to another module, isolation |
 | `owner-console.e2e.live.ts` | Browser test of the Owner Console: owner sign-in, snapshot pages, create institution, coupons, settings, alerts read-state, "Open as owner" into the panel, expired session |
 
 ## Running
