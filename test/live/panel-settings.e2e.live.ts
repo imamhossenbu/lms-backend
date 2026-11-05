@@ -1,7 +1,8 @@
 /**
  * Browser E2E for the admin panel Settings against the real API: General save (+ validation, reload, audit),
  * `?section=` kept across reloads, Payments gateway with a write-only secret (encrypted at rest, only the masked
- * hint comes back), the gateway "Test connection" endpoint, and isolation from another workspace.
+ * hint comes back), the gateway "Test connection" endpoint, isolation from another workspace and the admin idle
+ * session timeout (sent to the sign-in page with the reason).
  * Panel on :3010, API on :4077 by default. Cleanup in `finally`.
  */
 import { PANEL, SHOTS, check, cleanup, dumpPages, fill, launch, login, mkInstitution, mkUser, newTag, prisma as p, realClick, report, result, sleep, text, until, waitForText, type Ids } from "./panel-e2e-helpers";
@@ -96,6 +97,19 @@ const row = (institutionId: string) => p.workspaceSettings.findFirst({ where: { 
     await sleep(800);
     check("another workspace doesn't get the secret hint", !(await text(o.page)).includes("9z8y"));
     await o.ctx.close();
+
+    // ---------------------------------------------------------------- 7. idle session timeout → sign-in page
+    // Activity is recorded at most once a minute; the open page's background inbox refresh (every 60 s) or the
+    // next navigation then hits the timeout and the panel sends the admin to the sign-in page with the reason.
+    await page.goto(`${PANEL}/settings`, { waitUntil: "networkidle2" });
+    await p.user.update({ where: { id: admin.id }, data: { lastActiveAt: new Date(Date.now() - 200 * 60_000) } });
+    const signedOut = await page
+      .waitForFunction(() => location.pathname === "/login" && document.body.innerText.includes("You were signed out"), { timeout: 150_000, polling: 500 })
+      .then(() => true)
+      .catch(() => false);
+    const tIdle = await text(page);
+    check("an idle admin is sent to the sign-in page with the reason", signedOut && tIdle.includes("inactivity"), { url: page.url(), t: tIdle.slice(0, 200) });
+    await page.screenshot({ path: `${SHOTS}/set-3-idle.png` });
     await ctx.close();
   } catch (e) {
     console.log("FAIL exception", (e as Error).message || String(e).slice(0, 400));

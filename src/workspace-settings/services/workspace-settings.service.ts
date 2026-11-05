@@ -4,6 +4,7 @@ import type { Prisma } from "../../../generated/prisma";
 import { MailService } from "../../auth/mail/mail.service";
 import { encryptSecret } from "../../common/crypto";
 import { PrismaService } from "../../prisma/prisma.service";
+import { SecurityPolicyService } from "../security-policy.service";
 import type { ActorContext } from "../../team/services/team-access.service";
 import { AUDIT_MAX } from "../workspace-settings.constants";
 import { scopeKeyOf, storedSecrets, toStore } from "../workspace-settings.mapper";
@@ -23,6 +24,7 @@ export class WorkspaceSettingsService {
     private readonly reader: WorkspaceSettingsReader,
     private readonly mail: MailService,
     private readonly plans: PlanAccessService,
+    private readonly securityPolicy: SecurityPolicyService,
   ) {}
 
   async store(tenantId: string | null): Promise<SettingsStore> {
@@ -54,6 +56,7 @@ export class WorkspaceSettingsService {
         },
       });
     });
+    if (section === "security") this.securityPolicy.forget(ctx.tenantId);
     return toStore(row, defaults);
   }
 

@@ -19,6 +19,13 @@ model User {
   status            String    @default("PENDING")
   verificationToken String?   @unique
   lastLoginAt       DateTime?
+  /// Settings › Security › Login protection: wrong passwords in a row, and the lock they caused.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  /// Last password set / change (password expiry counts from here).
+  passwordChangedAt   DateTime  @default(now())
+  /// Last authenticated request (admin idle session timeout; updated at most once a minute).
+  lastActiveAt        DateTime?
 
   bio           String?
   education     String?

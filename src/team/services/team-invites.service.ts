@@ -10,6 +10,7 @@ import { assertCanGrant, plural } from "../team.rules";
 import type { TeamMemberView } from "../team.types";
 import { memberInclude, rolePermissions, STAFF_ROLE, TeamAccessService, toMemberView, type ActorContext, type Tx } from "./team-access.service";
 import { PlanAccessService } from "../../plan-access/plan-access.service";
+import { SecurityPolicyService } from "../../workspace-settings/security-policy.service";
 
 export const INVITE_EXPIRY_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -35,6 +36,7 @@ export class TeamInvitesService {
     private readonly mail: MailService,
     private readonly config: ConfigService,
     private readonly plans: PlanAccessService,
+    private readonly securityPolicy: SecurityPolicyService,
   ) {}
 
   private get prisma() {
@@ -175,6 +177,7 @@ export class TeamInvitesService {
   async accept(dto: AcceptInviteDto): Promise<{ joined: true; email: string }> {
     const m = await this.byToken(dto.token);
     if (m.inviteExpiresAt!.getTime() <= Date.now()) throw new GoneException("This invitation has expired. Ask the team admin to send a new one.");
+    await this.securityPolicy.assertPassword(m.institutionId ?? null, dto.password);
     const password = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
     await this.prisma.$transaction(async (tx) => {
@@ -183,7 +186,7 @@ export class TeamInvitesService {
       if (existing) {
         if (existing.deletedAt || existing.role !== STAFF_ROLE || (existing.institutionId ?? null) !== m.institutionId)
           throw new ConflictException("This email already belongs to another account.");
-        await tx.user.update({ where: { id: existing.id }, data: { name: dto.name, password, status: "ACTIVE", emailVerified: true } });
+        await tx.user.update({ where: { id: existing.id }, data: { name: dto.name, password, passwordChangedAt: new Date(), status: "ACTIVE", emailVerified: true } });
         userId = existing.id;
       } else {
         userId = (

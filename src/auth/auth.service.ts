@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
   NotFoundException,
@@ -21,6 +22,10 @@ import {
 import { MailService } from "./mail/mail.service";
 import { TwoFactorService } from "./two-factor.service";
 import { TeamAccessService } from "../team/services/team-access.service";
+import { SecurityPolicyService } from "../workspace-settings/security-policy.service";
+import { adminIpAllowed, afterFailedLogin, isPasswordExpired, lockMinutesLeft } from "../workspace-settings/security-policy";
+
+const minutes = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
 
 /** Purpose claim of the short-lived token between the password step and the 2FA code step. */
 const TWO_FACTOR_CHALLENGE = "2fa-login";
@@ -33,6 +38,7 @@ export class AuthService {
     private mailService: MailService,
     private twoFactor: TwoFactorService,
     private teamAccess: TeamAccessService,
+    private securityPolicy: SecurityPolicyService,
   ) {}
 
   // REGISTER
@@ -48,6 +54,7 @@ export class AuthService {
       throw new BadRequestException("Email already exists");
     }
 
+    await this.securityPolicy.assertPassword(null, dto.password);
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     // Generate 6-digit numeric verification OTP
@@ -210,8 +217,17 @@ export class AuthService {
         email: dto.email,
       },
     });
+    if (!user) throw new UnauthorizedException("Invalid credentials");
 
-    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
+    // Settings › Security › Login protection: a locked account can't even try a password.
+    const security = await this.securityPolicy.security(user.institutionId ?? null);
+    const locked = lockMinutesLeft(user.lockedUntil);
+    if (locked) throw new UnauthorizedException(`Too many failed sign-in attempts. Try again in ${minutes(locked)}.`);
+
+    if (!(await bcrypt.compare(dto.password, user.password))) {
+      const next = afterFailedLogin(user.failedLoginAttempts, security);
+      await this.prisma.user.update({ where: { id: user.id }, data: next });
+      if (next.lockedUntil) throw new UnauthorizedException(`Too many failed sign-in attempts. Your account is locked for ${minutes(security.lockoutMinutes)}.`);
       throw new UnauthorizedException("Invalid credentials");
     }
 
@@ -258,6 +274,19 @@ export class AuthService {
       throw new UnauthorizedException("Your team access has been suspended — contact the workspace owner");
     }
 
+    // Settings › Security › IP allowlist: admin sign-ins only from the listed networks.
+    if (user.role === "ADMIN" && !adminIpAllowed(ip, security)) {
+      throw new ForbiddenException("Sign-ins from your network aren't allowed for this workspace. Ask the workspace owner to add your IP address.");
+    }
+
+    // Settings › Security › Password expiry.
+    if (isPasswordExpired(user.passwordChangedAt, security.passwordExpiryDays)) {
+      throw new UnauthorizedException("Your password has expired. Use \"Forgot password\" to choose a new one.");
+    }
+
+    // The right password ends a failed-attempts streak.
+    if (user.failedLoginAttempts) await this.prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0 } });
+
     if (user.twoFactorEnabled) {
       return {
         twoFactorRequired: true,
@@ -287,7 +316,7 @@ export class AuthService {
   private async issueSession(user: { id: string; email: string; role: string; institutionId: string | null; twoFactorEnabled: boolean }, ip?: string) {
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date(), ...(ip ? { lastLoginIp: ip } : {}) },
+      data: { lastLoginAt: new Date(), lastActiveAt: new Date(), failedLoginAttempts: 0, lockedUntil: null, ...(ip ? { lastLoginIp: ip } : {}) },
     });
     return {
       twoFactorSetupRequired: await this.teamAccess.twoFactorSetupRequiredAtLogin(user),
@@ -318,6 +347,7 @@ export class AuthService {
       throw new UnauthorizedException("Incorrect current password");
     }
 
+    await this.securityPolicy.assertPassword(user.institutionId ?? null, dto.newPassword);
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
 
     await this.prisma.user.update({
@@ -326,6 +356,7 @@ export class AuthService {
       },
       data: {
         password: hashedPassword,
+        passwordChangedAt: new Date(),
       },
     });
 
@@ -428,8 +459,10 @@ export class AuthService {
       throw new NotFoundException("Invalid or expired reset token/code");
     }
 
+    await this.securityPolicy.assertPassword(user.institutionId ?? null, dto.newPassword);
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
 
+    // A reset also clears a lockout (the person proved they own the email).
     await this.prisma.user.update({
       where: {
         id: user.id,
@@ -437,6 +470,9 @@ export class AuthService {
       data: {
         password: hashedPassword,
         verificationToken: null,
+        passwordChangedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       },
     });
 

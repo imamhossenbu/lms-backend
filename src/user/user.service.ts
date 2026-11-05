@@ -6,6 +6,7 @@ import { BCRYPT_ROUNDS } from "../common/accounts";
 import { PrismaService } from "../prisma/prisma.service";
 import type { UpdateProfileDto } from "./dto/user.dto";
 import { PlanAccessService } from "../plan-access/plan-access.service";
+import { SecurityPolicyService } from "../workspace-settings/security-policy.service";
 
 /** Learners and instructors — the only roles the legacy /user admin endpoints may touch. */
 const MANAGED_ROLES = ["STUDENT", "TEACHER"];
@@ -21,6 +22,7 @@ export class UserService {
   constructor(
     private prisma: PrismaService,
     private plans: PlanAccessService,
+    private securityPolicy: SecurityPolicyService,
   ) {}
 
   async findOne(id: string) {
@@ -43,7 +45,8 @@ export class UserService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
     if (!(await bcrypt.compare(currentPass, user.password))) throw new BadRequestException("Current password is incorrect");
-    await this.prisma.user.update({ where: { id: userId }, data: { password: await bcrypt.hash(newPass, BCRYPT_ROUNDS) } });
+    await this.securityPolicy.assertPassword(user.institutionId ?? null, newPass);
+    await this.prisma.user.update({ where: { id: userId }, data: { password: await bcrypt.hash(newPass, BCRYPT_ROUNDS), passwordChangedAt: new Date() } });
     return { message: "Password updated successfully" };
   }
 

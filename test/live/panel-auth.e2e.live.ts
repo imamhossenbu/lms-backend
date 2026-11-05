@@ -136,7 +136,9 @@ async function typeCode(page: Page, code: string) {
     check("accept form validates (password rules + match)", (await text(page)).includes("at least 8 characters"));
     await page.screenshot({ path: `${SHOTS}/5-accept-validation.png` });
     for (const [sel, v] of [["#invite-password", "Newbie12345"], ["#invite-confirm", "Newbie12345"]] as const) {
-      await page.click(sel, { clickCount: 3 });
+      // Triple-click doesn't always select a password field; select() does.
+      await page.click(sel);
+      await page.$eval(sel, (el) => (el as HTMLInputElement).select());
       await page.keyboard.press("Backspace");
       await page.type(sel, v);
     }
@@ -170,6 +172,10 @@ async function typeCode(page: Page, code: string) {
   } catch (e) {
     console.log("FAIL exception", (e as Error).message);
     bad++;
+    for (const [i, pg] of (await browser.pages()).entries()) {
+      await pg.screenshot({ path: `${SHOTS}/auth-fail-${i}.png` }).catch(() => {});
+      console.log(`  page ${i}: ${pg.url()} :: ${(await pg.evaluate(() => document.body.innerText).catch(() => "")).slice(0, 600).replace(/\n/g, " | ")}`);
+    }
   } finally {
     await browser.close();
     if (ids.inst) {

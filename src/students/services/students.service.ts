@@ -12,6 +12,7 @@ import type { StudentDetails, StudentListItem, StudentStatusLabel } from "../stu
 import { StudentEnrollmentsService } from "./student-enrollments.service";
 import { StudentProgressService, type StudentSummary } from "./student-progress.service";
 import { PlanAccessService } from "../../plan-access/plan-access.service";
+import { SecurityPolicyService } from "../../workspace-settings/security-policy.service";
 
 /** Admin panel › Students: list, details, create (with auto password + welcome email), edit, status, soft delete. */
 @Injectable()
@@ -24,6 +25,7 @@ export class StudentsService {
     private readonly enrollments: StudentEnrollmentsService,
     private readonly mail: MailService,
     private readonly plans: PlanAccessService,
+    private readonly securityPolicy: SecurityPolicyService,
   ) {}
 
   /** Students visible to this admin: same tenant, not deleted. */
@@ -100,7 +102,8 @@ export class StudentsService {
   async create(actor: AuthUser, dto: CreateStudentDto): Promise<StudentDetails> {
     await this.plans.assertCanAdd(actor.institutionId ?? null, "students");
     await assertEmailFree(this.prisma, dto.email);
-    const password = generatePassword();
+    // Long enough for the workspace's password policy (it always mixes all character types).
+    const password = generatePassword(await this.securityPolicy.generatedPasswordLength(actor.institutionId ?? null));
     const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const student = await this.prisma.$transaction(async (tx) => {
