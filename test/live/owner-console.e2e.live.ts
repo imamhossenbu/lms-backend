@@ -26,7 +26,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function fill(page: Page, selector: string, value: string) {
   await page.waitForSelector(selector);
-  await page.click(selector, { clickCount: 3 });
+  // Triple-click doesn't always select the whole value (e.g. an auto-filled slug); select() does.
+  await page.click(selector);
+  await page.$eval(selector, (e) => (e as HTMLInputElement).select());
   await page.keyboard.press("Backspace");
   await page.type(selector, value);
 }
@@ -134,6 +136,25 @@ async function consoleLogin(page: Page, email: string, password: string) {
     await page.goto(`${CONSOLE}/coupons`, { waitUntil: "networkidle2" });
     await waitForText(page, code);
     check("coupons list shows the new coupon", true);
+
+    // ---------------------------------------------------------------- 4b. settings image upload (validation only; no file is stored)
+    const loginApi = async (email: string, password: string) =>
+      ((await (await fetch(`${API}/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) })).json()) as any).token as string;
+    const upload = (token: string, file?: { type: string; name: string }) => {
+      const form = new FormData();
+      if (file) form.append("file", new Blob([Buffer.from("not really an image")], { type: file.type }), file.name);
+      return fetch(`${API}/saas/owner/console-settings/upload`, { method: "POST", headers: { authorization: `Bearer ${token}` }, body: form });
+    };
+    const ownerToken = await loginApi(owner.email, "Owner12345");
+    const adminToken = await loginApi(notOwner.email, "Admin12345");
+    const noFile = await upload(ownerToken);
+    const wrongType = await upload(ownerToken, { type: "application/pdf", name: "x.pdf" });
+    const notOwnerUp = await upload(adminToken, { type: "image/png", name: "x.png" });
+    check("settings upload is a real endpoint: no file / wrong type → 400, non-owner → 403", noFile.status === 400 && wrongType.status === 400 && notOwnerUp.status === 403, {
+      noFile: noFile.status,
+      wrongType: wrongType.status,
+      notOwner: notOwnerUp.status,
+    });
 
     // ---------------------------------------------------------------- 5. console settings
     await page.goto(`${CONSOLE}/settings?tab=company`, { waitUntil: "networkidle2" });

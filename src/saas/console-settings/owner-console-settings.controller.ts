@@ -1,4 +1,6 @@
-import { Body, Controller, Get, HttpCode, Patch, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, HttpCode, Patch, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { CloudinaryService } from "../../cloudinary/cloudinary.service";
 import { Throttle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequireRoles, SaasValidation, type AuthUser } from "../controllers/saas-controller.utils";
@@ -15,7 +17,22 @@ import { ConsoleSettingsService } from "./services/console-settings.service";
 @RequireRoles(PLATFORM_OWNER_ROLE)
 @SaasValidation()
 export class OwnerConsoleSettingsController {
-  constructor(private readonly settings: ConsoleSettingsService) {}
+  constructor(
+    private readonly settings: ConsoleSettingsService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
+
+  /** Image for the console settings (e.g. the invoice logo): PNG / JPEG / SVG up to 2 MB → hosted URL. */
+  @Post("upload")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 2 * 1024 * 1024 } }))
+  @ApiOperation({ summary: "Upload an image (PNG, JPEG or SVG, max 2 MB) and get its hosted URL" })
+  async upload(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException("Choose an image to upload.");
+    if (!["image/png", "image/jpeg", "image/svg+xml"].includes(file.mimetype)) throw new BadRequestException("Use a PNG, JPEG or SVG image.");
+    return { url: await this.cloudinary.uploadImage(file) };
+  }
 
   @Get()
   @ApiOperation({ summary: "All sections (defaults when never saved), masked secret hints and per-section last-saved times" })

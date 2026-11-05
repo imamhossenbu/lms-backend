@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { MailService } from "../auth/mail/mail.service";
+import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { OwnerAlertsController } from "./alerts/owner-alerts.controller";
 import { AlertsService } from "./alerts/alerts.service";
@@ -65,6 +66,7 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     CouponsService,
     CouponRedemptionsService,
     AlertsService,
+    CloudinaryService,
   ],
   exports: [SaasCoreService, SaasPlansService, SaasInstitutionsService],
 })
