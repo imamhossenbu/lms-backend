@@ -1803,3 +1803,24 @@ model WorkspaceBackup {
   @@index([institutionId, createdAt])
   @@map("workspace_backups")
 }
+
+/// Marketing website › Contact form: a demo / sales / support request from a visitor. The platform owner is
+/// emailed for each one; NEW until handled.
+model MarketingLead {
+  id              String   @id @default(uuid())
+  name            String
+  email           String
+  phone           String   @default("")
+  institutionName String   @default("")
+  /// Rough size, e.g. "1-100" / "101-500" / "501-2000" / "2000+".
+  studentCount    String   @default("")
+  /// DEMO | SALES | SUPPORT | PARTNERSHIP | OTHER
+  topic           String
+  message         String
+  status          String   @default("NEW")
+  ip              String   @default("")
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("marketing_leads")
+}

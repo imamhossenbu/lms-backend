@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Post, Query, Req } from "@nestjs/common";
+import type { Request } from "express";
 import { Throttle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CheckCouponDto } from "../coupons/dto/coupon.dto";
@@ -8,6 +9,8 @@ import { SignupDto } from "../dto/signup.dto";
 import { SaasInstitutionsService } from "../services/saas-institutions.service";
 import { SaasPlansService } from "../services/saas-plans.service";
 import { SaasValidation } from "./saas-controller.utils";
+import { ContactRequestDto } from "../leads/contact.dto";
+import { MarketingLeadsService } from "../leads/marketing-leads.service";
 
 /** Unauthenticated endpoints for the public pricing + /signup pages. */
 @ApiTags("SaaS · Public")
@@ -18,7 +21,16 @@ export class SaasPublicController {
     private readonly plans: SaasPlansService,
     private readonly institutions: SaasInstitutionsService,
     private readonly coupons: CouponRedemptionsService,
+    private readonly leads: MarketingLeadsService,
   ) {}
+
+  @Post("contact")
+  @HttpCode(201)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: "Marketing website contact / demo form: stores the lead and emails the platform owner" })
+  contact(@Body() dto: ContactRequestDto, @Req() req: Request) {
+    return this.leads.create(dto, req.ip ?? "");
+  }
 
   @Get("plans")
   @ApiOperation({ summary: "Public, non-archived plans (pricing / signup page)" })
