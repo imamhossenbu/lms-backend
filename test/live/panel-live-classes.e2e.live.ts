@@ -129,6 +129,10 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
     await page.click('button[type="submit"]');
     await page.waitForFunction(() => location.pathname === "/", { timeout: 25000 });
 
+    // Every API list call the page makes (server-side paging check).
+    const apiCalls: string[] = [];
+    page.on("request", (r) => r.url().includes("/admin/") && apiCalls.push(r.url()));
+    const pagedCall = (path: string) => apiCalls.some((u) => { const url = new URL(u); return url.pathname.endsWith(path) && url.searchParams.has("page") && Number(url.searchParams.get("limit")) <= 20; });
     // ---------------------------------------------------------------- 1. list
     await page.goto(`${PANEL}/live-classes`, { waitUntil: "networkidle2" });
     await waitForText(page, `Past Class ${tag}`);
@@ -136,6 +140,7 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
     check("list loads from the API (seeded class, no mock classes)", !t0.includes("JavaScript Q&A Session") && !t0.includes("UI/UX Live Workshop"), t0.slice(0, 300));
     check("list shows the real course + instructor", t0.includes(`Live Course ${tag}`) && t0.includes("Live Teacher"));
     check("another workspace's class isn't listed", !t0.includes(`Foreign Class ${tag}`));
+    check("live class list asks the API for one page (page + limit)", pagedCall("/admin/live-classes"), apiCalls.filter((u) => u.includes("/admin/live-classes")).slice(0, 3));
     await page.screenshot({ path: `${SHOTS}/live-1-list.png` });
 
     // ---------------------------------------------------------------- 2. schedule through the form

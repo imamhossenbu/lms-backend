@@ -98,12 +98,17 @@ async function typeInEditor(page: Page, index: number, value: string) {
     await page.click('button[type="submit"]');
     await page.waitForFunction(() => location.pathname === "/", { timeout: 25000 });
 
+    // Every API list call the page makes (server-side paging check).
+    const apiCalls: string[] = [];
+    page.on("request", (r) => r.url().includes("/admin/") && apiCalls.push(r.url()));
+    const pagedCall = (path: string) => apiCalls.some((u) => { const url = new URL(u); return url.pathname.endsWith(path) && url.searchParams.has("page") && Number(url.searchParams.get("limit")) <= 20; });
     // ---------------------------------------------------------------- 1. list
     await page.goto(`${PANEL}/quizzes`, { waitUntil: "networkidle2" });
     await page.waitForFunction(() => /Quizzes/.test(document.body.innerText) && !document.querySelector('[aria-busy="true"]'), { timeout: 30000 });
     await sleep(800);
     const t0 = await text(page);
     check("quizzes list loads from the API (no mock quizzes)", !t0.includes("HTML Basics Quiz") && !t0.includes("CSS Fundamentals"), t0.slice(0, 300));
+    check("quiz list asks the API for one page (page + limit)", pagedCall("/admin/quizzes"), apiCalls.filter((u) => u.includes("/admin/quizzes")).slice(0, 3));
 
     // ---------------------------------------------------------------- 2. create through the wizard
     await page.goto(`${PANEL}/quizzes/create`, { waitUntil: "networkidle2" });
