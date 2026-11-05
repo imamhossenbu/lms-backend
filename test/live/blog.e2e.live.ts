@@ -103,7 +103,9 @@ const BODY = (n: string) =>
     await page.waitForFunction((id) => location.pathname === `/blog/${id}`, { timeout: 15000 }, saved.id);
     check("after creating, the editor moves to the post's URL", true);
 
-    // Publish from the editor.
+    // Publish from the editor (wait for it to load the saved post).
+    await waitForText(page, "Save changes");
+    await sleep(500);
     await page.evaluate(() => {
       const label = [...document.querySelectorAll<HTMLElement>("*")].find((e) => e.childElementCount === 0 && e.innerText?.trim() === "Published" && e.closest("form"));
       let el: HTMLElement | null = label ?? null;
@@ -122,10 +124,8 @@ const BODY = (n: string) =>
     const art = await text(site);
     check("website article shows title, author and body", art.includes(title) && art.includes("EduPro Team") && art.includes(`First section console`), art.slice(0, 200));
     check("article has a contents list and rendered quote", /on this page/i.test(art) && !!(await site.$("article blockquote")));
-    // The article streams (loading skeleton), so Next marks a missing post with noindex instead of a 404 status.
     const res404 = await site.goto(`${SITE}/blog/no-such-post-${tag}`, { waitUntil: "networkidle2" });
-    const noindex = await site.$$eval('meta[name="robots"]', (ms) => ms.some((m) => (m as HTMLMetaElement).content.includes("noindex")));
-    check("unknown article → 404 page (noindex)", (await text(site)).includes("doesn't exist") && (res404?.status() === 404 || noindex), { status: res404?.status(), noindex });
+    check("unknown article → 404 status and page", res404?.status() === 404 && (await text(site)).includes("doesn't exist"), res404?.status());
 
     // The list is cached for a minute — reload until the new category shows.
     let listed = false;
