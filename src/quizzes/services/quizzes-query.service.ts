@@ -36,7 +36,15 @@ export class QuizzesQueryService {
       ...(q.lessonId && { lessonId: q.lessonId }),
       ...(q.status && { status: q.status }),
       ...(q.difficulty && { difficulty: q.difficulty }),
-      ...(q.q && { title: { contains: q.q, mode: "insensitive" as const } }),
+      // Search: title, description, course or module title.
+      ...(q.q && {
+        OR: [
+          { title: { contains: q.q, mode: "insensitive" as const } },
+          { description: { contains: q.q, mode: "insensitive" as const } },
+          { course: { title: { contains: q.q, mode: "insensitive" as const } } },
+          { module: { title: { contains: q.q, mode: "insensitive" as const } } },
+        ],
+      }),
     };
     const [rows, total] = await Promise.all([
       this.prisma.quiz.findMany({ where, include: withQuestions, orderBy: [{ [q.sortBy]: q.sortOrder }, { id: "asc" }], ...skipTake(q) }),

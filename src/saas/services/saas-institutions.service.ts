@@ -14,6 +14,9 @@ import { cycleLabel, DAY_MS, initialsOf, periodEndFrom, priceFor, sortPlans } fr
 import type { BillingCycle, EventView, InstitutionView, InvoiceView, SaasActorKind, SaasSnapshot } from "../saas.types";
 import { SaasCoreService, type Tx } from "./saas-core.service";
 
+/** Invoices in the snapshot: the last ~15 months (unpaid ones always). */
+const SNAPSHOT_INVOICE_DAYS = 460;
+
 type BaseValues = {
   name: string;
   type: CreateInstitutionDto["type"];
@@ -53,7 +56,12 @@ export class SaasInstitutionsService {
     const [plans, institutions, invoices, events] = await Promise.all([
       this.core.plans(),
       this.prisma.institution.findMany({ include: { customDomain: true }, orderBy: { createdAt: "desc" } }),
-      this.prisma.saasInvoice.findMany({ orderBy: { issuedAt: "desc" } }),
+      // The console's charts look back 14 months: send that window plus every unpaid invoice (older ones are
+      // read page by page through GET /saas/owner/invoices/page).
+      this.prisma.saasInvoice.findMany({
+        where: { OR: [{ issuedAt: { gte: new Date(Date.now() - SNAPSHOT_INVOICE_DAYS * 86_400_000) } }, { status: { in: ["OPEN", "FAILED"] } }] },
+        orderBy: { issuedAt: "desc" },
+      }),
       this.prisma.saasEvent.findMany({ orderBy: { at: "desc" }, take: MAX_EVENTS_IN_SNAPSHOT }),
     ]);
     return {

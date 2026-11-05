@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import type { SaasInvoiceStatus } from "../../../generated/prisma";
+import type { Prisma, SaasInvoiceStatus } from "../../../generated/prisma";
+import { paginated, skipTake, type Paginated } from "../../common/pagination";
+import { localToInstant } from "../../common/workspace-time";
+import type { InvoicePageQueryDto } from "../dto/subscription.dto";
 import { toInvoiceView } from "../saas.mapper";
 import { money } from "../saas.math";
 import type { InvoiceView, SaasActorKind } from "../saas.types";
@@ -22,6 +25,50 @@ export class SaasInvoicesService {
       orderBy: { issuedAt: "desc" },
     });
     return rows.map(toInvoiceView);
+  }
+
+  /** The console's invoices table: search (number / institution), status, plan, issued range, sort, one page. */
+  async page(q: InvoicePageQueryDto): Promise<Paginated<InvoiceView>> {
+    const from = q.from ? localToInstant(q.from, "00:00") : null;
+    const to = q.to ? localToInstant(q.to, "23:59") : null;
+    const where: Prisma.SaasInvoiceWhereInput = {
+      ...(q.status && { status: q.status }),
+      ...(q.planId && { planId: q.planId }),
+      ...((from || to) && { issuedAt: { ...(from && { gte: from }), ...(to && { lte: new Date(to.getTime() + 59_999) }) } }),
+      ...(q.q && {
+        OR: [{ number: { contains: q.q, mode: "insensitive" as const } }, { institution: { name: { contains: q.q, mode: "insensitive" as const } } }],
+      }),
+    };
+    const orderBy: Prisma.SaasInvoiceOrderByWithRelationInput[] = [q.sort === "amount" ? { total: q.dir } : { issuedAt: q.dir }, { id: "asc" }];
+    const [rows, total] = await Promise.all([
+      this.core.prisma.saasInvoice.findMany({ where, orderBy, ...skipTake(q) }),
+      this.core.prisma.saasInvoice.count({ where }),
+    ]);
+    return paginated(rows.map(toInvoiceView), total, q);
+  }
+
+  /** Invoices page KPIs over every invoice: collected this / last month (Asia/Dhaka months), open, failed, refunded. */
+  async stats(now = new Date()) {
+    const local = new Date(now.getTime() + 6 * 3_600_000);
+    const ym = (y: number, m: number) => `${new Date(Date.UTC(y, m, 1)).getUTCFullYear()}-${String(new Date(Date.UTC(y, m, 1)).getUTCMonth() + 1).padStart(2, "0")}-01`;
+    const monthStart = localToInstant(ym(local.getUTCFullYear(), local.getUTCMonth()), "00:00")!;
+    const lastMonthStart = localToInstant(ym(local.getUTCFullYear(), local.getUTCMonth() - 1), "00:00")!;
+    const sum = async (where: Prisma.SaasInvoiceWhereInput) => {
+      const r = await this.core.prisma.saasInvoice.aggregate({ where, _sum: { total: true }, _count: { _all: true } });
+      return { count: r._count._all, total: money(Number(r._sum.total ?? 0)) };
+    };
+    const [collected, previous, open, failed, refunded] = await Promise.all([
+      sum({ status: "PAID", paidAt: { gte: monthStart } }),
+      sum({ status: "PAID", paidAt: { gte: lastMonthStart, lt: monthStart } }),
+      sum({ status: "OPEN" }),
+      sum({ status: "FAILED" }),
+      sum({ status: "REFUNDED" }),
+    ]);
+    return { collectedThisMonth: collected.total, collectedLastMonth: previous.total, open, failed, refunded };
+  }
+
+  async one(id: string): Promise<InvoiceView> {
+    return this.core.mustInvoice(this.core.prisma, id);
   }
 
   /** Throws unless the invoice belongs to `institutionId` (institution-scoped endpoints). */

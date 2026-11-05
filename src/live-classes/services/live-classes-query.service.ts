@@ -90,7 +90,16 @@ export class LiveClassesQueryService {
     if (q.instructorId) and.push({ instructorId: q.instructorId });
     if (q.type) and.push({ type: q.type });
     if (q.status) and.push(displayStatusWhere(q.status));
-    if (q.q) and.push({ title: { contains: q.q, mode: "insensitive" } });
+    // Search: title, description, course title or instructor name.
+    if (q.q)
+      and.push({
+        OR: [
+          { title: { contains: q.q, mode: "insensitive" } },
+          { description: { contains: q.q, mode: "insensitive" } },
+          { course: { title: { contains: q.q, mode: "insensitive" } } },
+          { instructor: { name: { contains: q.q, mode: "insensitive" } } },
+        ],
+      });
     if (q.from) and.push({ startTime: { gte: localToInstant(q.from, "00:00")! } });
     if (q.to) and.push({ startTime: { lt: new Date(localToInstant(q.to, "00:00")!.getTime() + DAY_MS) } });
     const where = { AND: and };

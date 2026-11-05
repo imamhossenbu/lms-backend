@@ -1,6 +1,6 @@
 import { Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { ListEventsQueryDto, ListInvoicesQueryDto } from "../dto/subscription.dto";
+import { InvoicePageQueryDto, ListEventsQueryDto, ListInvoicesQueryDto } from "../dto/subscription.dto";
 import { PLATFORM_OWNER_ROLE } from "../saas.constants";
 import { SaasInstitutionsService } from "../services/saas-institutions.service";
 import { SaasInvoicesService } from "../services/saas-invoices.service";
@@ -42,6 +42,24 @@ export class OwnerBillingController {
   @Get("invoices")
   listInvoices(@Query() q: ListInvoicesQueryDto) {
     return this.invoices.list(q);
+  }
+
+  @Get("invoices/page")
+  @ApiOperation({ summary: "Invoices table: search (number / institution), status, plan, issued from / to, sort, page / limit" })
+  invoicePage(@Query() q: InvoicePageQueryDto) {
+    return this.invoices.page(q);
+  }
+
+  @Get("invoices/stats")
+  @ApiOperation({ summary: "Invoices KPIs over all invoices: collected this / last month, open, failed, refunded (count + total)" })
+  invoiceStats() {
+    return this.invoices.stats();
+  }
+
+  @Get("invoices/:id")
+  @ApiOperation({ summary: "One invoice (also ones older than the snapshot window)" })
+  invoice(@Id() id: string) {
+    return this.invoices.one(id);
   }
 
   @Post("invoices/:id/retry")

@@ -133,9 +133,40 @@ async function consoleLogin(page: Page, email: string, password: string) {
       coupon = await p.saasCoupon.findFirst({ where: { code } });
     }
     check("coupon created via the API", !!coupon && Number(coupon.value) === 15, coupon);
+    const seen: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/saas/owner/")) seen.push(r.url());
+    });
     await page.goto(`${CONSOLE}/coupons`, { waitUntil: "networkidle2" });
     await waitForText(page, code);
     check("coupons list shows the new coupon", true);
+    check("coupons list asks the API for one page (page + limit)", seen.some((u) => /\/saas\/owner\/coupons\?.*page=1.*limit=10|\/saas\/owner\/coupons\?.*limit=10.*page=1/.test(u)), seen.filter((u) => u.includes("coupons")));
+
+    // ---------------------------------------------------------------- 4a. invoices: server pages + an invoice older than the snapshot window
+    const old = await p.saasInvoice.create({
+      data: {
+        number: `${tag.toUpperCase()}-OLD`,
+        institutionId: ids.inst!,
+        planId: "starter",
+        cycle: "MONTHLY",
+        amount: 29,
+        tax: 0,
+        total: 29,
+        status: "PAID",
+        issuedAt: new Date(Date.now() - 800 * 864e5),
+        dueAt: new Date(Date.now() - 793 * 864e5),
+        paidAt: new Date(Date.now() - 799 * 864e5),
+        periodStart: new Date(Date.now() - 800 * 864e5),
+        periodEnd: new Date(Date.now() - 770 * 864e5),
+      },
+    });
+    seen.length = 0;
+    await page.goto(`${CONSOLE}/invoices?q=${encodeURIComponent(old.number)}`, { waitUntil: "networkidle2" });
+    await waitForText(page, old.number);
+    check("invoices table finds an old invoice through the server search", seen.some((u) => u.includes("/saas/owner/invoices/page") && u.includes("page=1") && u.includes("limit=")) && seen.some((u) => u.includes("/saas/owner/invoices/stats")), seen.filter((u) => u.includes("invoices")));
+    await page.goto(`${CONSOLE}/invoices/${old.id}`, { waitUntil: "networkidle2" });
+    await waitForText(page, old.number);
+    check("an invoice outside the snapshot window still opens", !(await text(page)).includes("We couldn't find this invoice"));
 
     // ---------------------------------------------------------------- 4b. settings image upload (validation only; no file is stored)
     const loginApi = async (email: string, password: string) =>

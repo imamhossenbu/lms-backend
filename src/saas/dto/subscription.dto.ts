@@ -3,6 +3,7 @@ import { IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Matches, Max, M
 import { IsOptionalCouponCode } from "../coupons/dto/coupon.dto";
 import { HOSTNAME_REGEX, PAYMENT_BRANDS, type PaymentBrand } from "../saas.constants";
 import { IsCycle, IsPlanId, Trim } from "./common";
+import { PaginationQueryDto } from "../../common/pagination";
 
 export class ChangePlanDto {
   @IsPlanId() planId!: string;
@@ -70,6 +71,19 @@ export class CustomDomainDto {
 export class ListInvoicesQueryDto {
   @IsOptional() @Trim() @IsString() institutionId?: string;
   @IsOptional() @IsIn(["PAID", "OPEN", "FAILED", "REFUNDED", "VOID"]) status?: "PAID" | "OPEN" | "FAILED" | "REFUNDED" | "VOID";
+}
+
+/** GET /saas/owner/invoices/page — the console's invoices table, one page at a time. */
+export class InvoicePageQueryDto extends PaginationQueryDto {
+  /** Invoice number or institution name. */
+  @IsOptional() @Trim() @IsString() @MaxLength(100) q?: string;
+  @IsOptional() @IsIn(["PAID", "OPEN", "FAILED", "REFUNDED", "VOID"]) status?: "PAID" | "OPEN" | "FAILED" | "REFUNDED" | "VOID";
+  @IsOptional() @Trim() @IsString() @MaxLength(40) planId?: string;
+  /** Issued on or after / on or before (YYYY-MM-DD). */
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "from must be YYYY-MM-DD" }) from?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "to must be YYYY-MM-DD" }) to?: string;
+  @IsOptional() @IsIn(["issued", "amount"]) sort: "issued" | "amount" = "issued";
+  @IsOptional() @IsIn(["asc", "desc"]) dir: "asc" | "desc" = "desc";
 }
 
 export class ListEventsQueryDto {
