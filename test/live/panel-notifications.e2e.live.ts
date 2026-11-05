@@ -50,11 +50,16 @@ async function rowAction(page: Page, title: string, label: string) {
 
     const { ctx, page } = await login(browser, admin.email);
 
+    // Every API list call the page makes (server-side paging check).
+    const apiCalls: string[] = [];
+    page.on("request", (r) => r.url().includes("/admin/") && apiCalls.push(r.url()));
+    const pagedCall = (path: string) => apiCalls.some((u) => { const url = new URL(u); return url.pathname.endsWith(path) && url.searchParams.has("page") && Number(url.searchParams.get("limit")) <= 20; });
     // ---------------------------------------------------------------- 1. inbox + bell
     await page.goto(`${PANEL}/notifications`, { waitUntil: "networkidle2" });
     await waitForText(page, `Inbox One ${tag}`);
     const t0 = await text(page);
     check("inbox loads from the API", t0.includes(`Inbox Two ${tag}`) && !t0.includes(`Foreign Note ${tag}`), t0.slice(0, 300));
+    check("inbox and bell ask the API for pages + counters (no full inbox)", pagedCall("/admin/notifications/inbox") && apiCalls.some((u) => u.includes("/inbox/stats")) && !apiCalls.some((u) => /\/inbox\?.*limit=100/.test(u)), apiCalls.filter((u) => u.includes("/inbox")).slice(0, 4));
     const bell = await until(() => page.$$eval("button[aria-label^='Notifications']", (bs) => bs.map((b) => b.getAttribute("aria-label")).join("|")), (v) => v.includes("2 unread"));
     check("navbar bell shows the unread count", bell.includes("2 unread"), bell);
     await page.screenshot({ path: `${SHOTS}/notif-1-inbox.png` });
@@ -98,6 +103,7 @@ async function rowAction(page: Page, title: string, label: string) {
     await page.reload({ waitUntil: "networkidle2" });
     await waitForText(page, title);
     const t4 = await text(page);
+    check("broadcast list asks the API for one page (page + limit)", pagedCall("/admin/notifications/broadcasts"), apiCalls.filter((u) => u.includes("/broadcasts")).slice(0, 3));
     check("?tab=broadcasts stays open after a reload and lists the broadcast", new URL(page.url()).searchParams.get("tab") === "broadcasts" && !t4.includes(`Foreign Broadcast ${tag}`));
     await page.goto(`${PANEL}/notifications/broadcasts/${sent.id}`, { waitUntil: "networkidle2" });
     await waitForText(page, title);
