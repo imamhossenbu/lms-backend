@@ -212,6 +212,66 @@ export class SaasInstitutionsService {
     return { institution, coupon, email: v.email, message: "Workspace created. Check your email for the 6-digit verification code." };
   }
 
+  // ---------------------------------------------------------------- paid checkout (website → SSLCommerz)
+
+  /** Before sending someone to the gateway: the plan can be bought and the email / subdomain are free. */
+  async assertCanBuy(v: { email: string; slug: string; planId: string }) {
+    const plan = await this.core.mustPlan(this.prisma, v.planId);
+    if (plan.archived || !plan.isPublic) throw new BadRequestException("This plan isn't available to buy online.");
+    const slug = v.slug.trim().toLowerCase();
+    if (isReservedSlug(slug)) throw new BadRequestException("This subdomain is reserved — choose another.");
+    if (await this.slugTaken(this.prisma, slug)) throw new ConflictException(`${slug}.${SAAS_ROOT_DOMAIN} is already taken — choose another subdomain.`);
+    const email = v.email.trim().toLowerCase();
+    const [user, inst] = await Promise.all([
+      this.prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, select: { id: true } }),
+      this.prisma.institution.count({ where: { ownerEmail: email, status: { not: "CANCELLED" } } }),
+    ]);
+    if (user || inst) throw new ConflictException("An account with this email already exists — sign in instead.");
+    return plan;
+  }
+
+  /**
+   * After SSLCommerz confirmed the payment: creates the ACTIVE institution (no trial; first period paid), its ADMIN
+   * user (PENDING until the emailed 6-digit code is verified, like self-signup) and the PAID first invoice.
+   * Runs inside the caller's transaction; returns the verification code to email once it commits.
+   */
+  async createFromPaidCheckout(
+    tx: Tx,
+    c: { name: string; email: string; passwordHash: string; phone: string; institutionName: string; institutionType: string; country: string; slug: string; planId: string; cycle: BillingCycle; subtotal: number; tranId: string; cardType: string },
+  ): Promise<{ institution: InstitutionView; otp: string }> {
+    const plan = await this.core.mustPlan(tx, c.planId);
+    const inst = await this.build(
+      tx,
+      { name: c.institutionName, type: c.institutionType as never, country: c.country, ownerName: c.name, ownerEmail: c.email, phone: c.phone, slug: c.slug, planId: c.planId, cycle: c.cycle, notes: "" },
+      null,
+      "SELF_SIGNUP",
+    );
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await tx.user.create({
+      data: { name: c.name, email: c.email.trim().toLowerCase(), password: c.passwordHash, role: INSTITUTION_ADMIN_ROLE, status: "PENDING", verificationToken: otp, institutionId: inst.id },
+    });
+    await this.core.event(tx, inst.id, "SIGNED_UP", `${inst.name} bought ${plan.name} (${cycleLabel(c.cycle)}) on the website — ${inst.slug}.${SAAS_ROOT_DOMAIN}`, "Institution");
+    await this.core.addInvoice(tx, inst, {
+      planId: plan.id,
+      cycle: c.cycle,
+      amount: c.subtotal,
+      periodStart: new Date(inst.subscription.currentPeriodStart),
+      periodEnd: new Date(inst.subscription.currentPeriodEnd),
+      paid: true,
+      description: `${plan.name} plan — ${cycleLabel(c.cycle)} subscription · SSLCommerz ${c.tranId}${c.cardType ? ` (${c.cardType})` : ""}`,
+    });
+    return { institution: await this.core.mustInstitution(tx, inst.id), otp };
+  }
+
+  /** Emails the 6-digit verification code (failures are logged, not thrown). */
+  async sendVerification(email: string, otp: string) {
+    try {
+      await this.mail.sendVerificationEmail(email, otp);
+    } catch (err: any) {
+      this.logger.warn(`Verification email failed for ${email}: ${err?.message ?? err}`);
+    }
+  }
+
   // ---------------------------------------------------------------- edit
 
   async update(id: string, patch: UpdateInstitutionDto): Promise<InstitutionView> {

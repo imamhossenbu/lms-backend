@@ -121,6 +121,12 @@ export class SaasCoreService {
     return invoice;
   }
 
+  /** Tax on `amount` for `country` (country rate, else Console settings › Billing tax rate) — same as addInvoice. */
+  async taxOn(tx: Tx, country: string, amount: number): Promise<number> {
+    const billing = await this.consoleSettings.section("billing", tx);
+    return taxFor(country, round2(amount), billing.taxRate);
+  }
+
   hasUnpaid(tx: Tx, institutionId: string) {
     return tx.saasInvoice.count({ where: { institutionId, status: { in: ["OPEN", "FAILED"] } } }).then((n) => n > 0);
   }

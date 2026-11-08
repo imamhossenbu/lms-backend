@@ -1877,3 +1877,44 @@ model BlogPost {
   @@index([category])
   @@map("blog_posts")
 }
+
+/// A plan purchase started on the marketing website's /checkout and paid through SSLCommerz. The academy and its
+/// admin are created only after the gateway payment is validated server-to-server.
+model SaasCheckout {
+  id            String    @id @default(uuid())
+  /// Our reference sent to the gateway as tran_id (also the public lookup key for the result page).
+  tranId        String    @unique
+  planId        String
+  cycle         String
+  /// Charged amounts (USD): plan price + tax for the chosen country.
+  subtotal      Float
+  tax           Float
+  total         Float
+  currency      String    @default("USD")
+  /// PENDING → PAID | FAILED | CANCELLED
+  status        String    @default("PENDING")
+  /// Sign-up details (password stored as a bcrypt hash only).
+  name          String
+  email         String
+  phone         String    @default("")
+  passwordHash  String
+  institutionName String
+  institutionType String
+  country       String
+  slug          String
+  /// Set once the academy is created after a validated payment.
+  institutionId String?
+  /// Gateway details from the validation API.
+  valId         String    @default("")
+  bankTranId    String    @default("")
+  cardType      String    @default("")
+  /// Why it failed (shown on the result page).
+  error         String    @default("")
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("saas_checkouts")
+}

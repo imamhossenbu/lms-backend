@@ -8,6 +8,9 @@ import { OwnerTestimonialsController } from "./testimonials/owner-testimonials.c
 import { BlogService } from "./blog/blog.service";
 import { OwnerBlogController } from "./blog/owner-blog.controller";
 import { PublicBlogController } from "./blog/public-blog.controller";
+import { CommerceModule } from "../commerce/commerce.module";
+import { CheckoutService } from "./checkout/checkout.service";
+import { PublicCheckoutController } from "./checkout/public-checkout.controller";
 import { CloudinaryService } from "../cloudinary/cloudinary.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { OwnerAlertsController } from "./alerts/owner-alerts.controller";
@@ -46,12 +49,14 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
 @Module({
   imports: [
     PrismaModule,
+    CommerceModule,
     JwtModule.register({ secret: process.env.SUPER_SECRET_KEY, signOptions: { expiresIn: "1d" } }),
   ],
   controllers: [
     OwnerTestimonialsController,
     OwnerBlogController,
     PublicBlogController,
+    PublicCheckoutController,
     SaasPublicController,
     OwnerPlansController,
     OwnerInstitutionsController,
@@ -75,6 +80,7 @@ import { SaasSubscriptionService } from "./services/saas-subscription.service";
     PlatformStatsService,
     TestimonialsService,
     BlogService,
+    CheckoutService,
     ConsoleSettingsReader,
     ConsoleSettingsService,
     CouponsService,
