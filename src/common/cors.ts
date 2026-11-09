@@ -7,7 +7,8 @@ const CACHE_MS = 5 * 60_000;
 
 /**
  * CORS allowlist (instead of reflecting every origin with credentials):
- *  - FRONTEND_URL and CORS_ORIGINS (comma-separated), plus localhost:3000 / 3001 outside production
+ *  - FRONTEND_URL, CONSOLE_URL, WEBSITE_URL and CORS_ORIGINS (comma-separated), plus localhost:3000 / 3001 / 3002
+ *    outside production (the marketing website calls checkout, contact and slug checks from the browser)
  *  - https://<slug>.edupro.com tenant subdomains
  *  - verified institution custom domains (from the DB, cached for 5 minutes)
  * Requests without an Origin header (server-to-server, curl, payment gateway callbacks) are allowed.
@@ -18,7 +19,8 @@ export function buildCorsOptions(prisma: PrismaService, env: NodeJS.ProcessEnv =
       ...envList(env.CORS_ORIGINS),
       env.FRONTEND_URL,
       env.CONSOLE_URL,
-      ...(env.NODE_ENV === "production" ? [] : ["http://localhost:3000", "http://localhost:3001"]),
+      env.WEBSITE_URL,
+      ...(env.NODE_ENV === "production" ? [] : ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]),
     ]
       .filter((o): o is string => !!o)
       .map((o) => o.replace(/\/$/, "")),

@@ -35,5 +35,11 @@ describe("CORS allowlist", () => {
   it("allows localhost outside production", async () => {
     const dev = buildCorsOptions(fakePrisma, { NODE_ENV: "development" } as any);
     expect(await allowed(dev, "http://localhost:3000")).toBe(true);
+    expect(await allowed(dev, "http://localhost:3002")).toBe(true);
+  });
+
+  it("allows the marketing website (WEBSITE_URL)", async () => {
+    const prod = buildCorsOptions(fakePrisma, { NODE_ENV: "production", WEBSITE_URL: "https://edupro.com/" } as any);
+    expect(await allowed(prod, "https://edupro.com")).toBe(true);
   });
 });
