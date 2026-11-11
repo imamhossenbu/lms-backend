@@ -4,7 +4,7 @@
  * re-sign-up of an unfinished account allowed), sign-in only for this academy's learners, free course → enrolled,
  * coupon quote errors / discount, 100% coupon → paid without the gateway (coupon counted once), paid course →
  * real SSLCommerz sandbox session, cancel callback → 303 to the academy site + CANCELLED, forged success callback
- * never pays, other learners can't read the order. Own workspaces; cleanup in `finally`.
+ * never pays, other learners can't read the order, forgot / reset password with an emailed code. Own workspaces; cleanup in `finally`.
  */
 import { check, cleanup, mkCourse, mkInstitution, mkUser, newTag, prisma as p, report, retry, type Ids } from "./panel-e2e-helpers";
 
@@ -127,6 +127,21 @@ const form = (path: string, body: Record<string, string>) =>
     const v2 = await call("POST", `${A}/verify`, { email: u2.email, code: u2.verificationToken });
     const peek = await call("GET", `${M}/orders/${of.id}`, undefined, v2.data.token);
     check("another learner can't read the order (404)", other2.status === 201 && peek.status === 404, peek.data);
+
+    // ---------------------------------------------------------------- forgot / reset password
+    const fg = await call("POST", `${A}/forgot`, { email });
+    const unknown = await call("POST", `${A}/forgot`, { email: `${tag}-nobody@example.com` });
+    const tokenRow = await p.user.findUnique({ where: { email }, select: { verificationToken: true } });
+    const resetCode = (tokenRow?.verificationToken ?? "").split(":")[1];
+    check("forgot: same answer for known / unknown emails, code stored with expiry", fg.status === 200 && unknown.status === 200 && fg.data.message === unknown.data.message && /^\d{6}$/.test(resetCode ?? ""), tokenRow?.verificationToken);
+    const wrongCode = await call("POST", `${A}/reset`, { email, code: resetCode === "000000" ? "111111" : "000000", newPassword: "Brandnew!234" });
+    const weak = await call("POST", `${A}/reset`, { email, code: resetCode, newPassword: "short" });
+    check("reset: wrong code → 400, weak password → 400", wrongCode.status === 400 && weak.status === 400, { wrongCode: wrongCode.data, weak: weak.data });
+    const okReset = await call("POST", `${A}/reset`, { email, code: resetCode, newPassword: "Brandnew!234" });
+    const reuse = await call("POST", `${A}/reset`, { email, code: resetCode, newPassword: "Another!234" });
+    const oldPw = await call("POST", `${A}/login`, { email, password: "Passw0rd!y" });
+    const newPw = await call("POST", `${A}/login`, { email, password: "Brandnew!234" });
+    check("reset with the right code: new password works, old fails, code can't be reused", okReset.status === 200 && reuse.status === 400 && oldPw.status === 401 && newPw.status === 200, [okReset.status, reuse.status, oldPw.status, newPw.status]);
   } catch (err) {
     check("suite crashed", false, (err as Error).stack);
   } finally {

@@ -9,7 +9,7 @@ import { AcademyCheckoutService } from "./academy-checkout.service";
 import { LearnerAuthService } from "./learner-auth.service";
 import { LearnerPlayerService } from "./learner-player.service";
 import { LearnerDashboardService } from "./learner-dashboard.service";
-import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerPasswordDto, LearnerProfileDto, LearnerRegisterDto, LearnerVerifyDto, LiveQueryDto, StartCheckoutDto } from "./learner.dto";
+import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerPasswordDto, LearnerProfileDto, LearnerRegisterDto, LearnerResetDto, LearnerVerifyDto, LiveQueryDto, StartCheckoutDto } from "./learner.dto";
 
 /** Learner sign-up / sign-in on an academy's website (the site calls these from its own server). */
 @ApiTags("Academy site · Learners")
@@ -39,6 +39,22 @@ export class LearnerAuthController {
   @ApiOperation({ summary: "Send a new sign-up code" })
   resend(@Param("slug") slug: string, @Body() dto: LearnerEmailDto) {
     return this.learners.resend(slug, dto);
+  }
+
+  @Post("forgot")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: "Email a 6-digit password reset code (same answer whether or not the account exists)" })
+  forgot(@Param("slug") slug: string, @Body() dto: LearnerEmailDto) {
+    return this.learners.forgot(slug, dto);
+  }
+
+  @Post("reset")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: "Set a new password with the emailed code (30 min, 5 tries)" })
+  reset(@Param("slug") slug: string, @Body() dto: LearnerResetDto) {
+    return this.learners.reset(slug, dto);
   }
 
   @Post("login")

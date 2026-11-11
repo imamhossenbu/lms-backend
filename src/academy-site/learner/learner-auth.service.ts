@@ -7,7 +7,7 @@ import { PlanAccessService } from "../../plan-access/plan-access.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SecurityPolicyService } from "../../workspace-settings/security-policy.service";
 import { ONLINE_STATUSES } from "../academy-site.mapper";
-import type { LearnerEmailDto, LearnerLoginDto, LearnerRegisterDto, LearnerVerifyDto } from "./learner.dto";
+import type { LearnerEmailDto, LearnerLoginDto, LearnerRegisterDto, LearnerResetDto, LearnerVerifyDto } from "./learner.dto";
 
 export interface LearnerSession {
   token: string;
@@ -118,6 +118,45 @@ export class LearnerAuthService {
   private async passwordMatches(userId: string, password: string) {
     const row = await this.prisma.user.findUnique({ where: { id: userId }, select: { password: true } });
     return !!row && (await bcrypt.compare(password, row.password));
+  }
+
+  // ---------------------------------------------------------------- password reset
+  // The code lives in verificationToken as "reset:<code>:<expiresMs>:<attempts>:<userId>" (unique column → userId suffix).
+
+  async forgot(slug: string, dto: LearnerEmailDto) {
+    const inst = await this.academy(slug);
+    const user = await this.prisma.user.findFirst({ where: { email: dto.email, institutionId: inst.id, role: "STUDENT", emailVerified: true, deletedAt: null }, select: { id: true, name: true } });
+    if (user) {
+      const code = this.code();
+      await this.prisma.user.update({ where: { id: user.id }, data: { verificationToken: `reset:${code}:${Date.now() + 30 * 60_000}:0:${user.id}` } });
+      try {
+        await this.mail.sendAcademyResetCode(dto.email, user.name, code, inst.name);
+      } catch (err: any) {
+        this.logger.error(`Reset email to ${dto.email} failed: ${err?.message ?? err}`);
+      }
+    }
+    // Same answer either way (no account probing).
+    return { message: "If an account exists for that email, we've sent a 6-digit code." };
+  }
+
+  async reset(slug: string, dto: LearnerResetDto) {
+    const inst = await this.academy(slug);
+    const user = await this.prisma.user.findFirst({ where: { email: dto.email, institutionId: inst.id, role: "STUDENT", deletedAt: null }, select: { id: true, verificationToken: true } });
+    const [kind, code, expires, attempts] = (user?.verificationToken ?? "").split(":");
+    const invalid = new BadRequestException("That code isn't right or has expired. Request a new one.");
+    if (!user || kind !== "reset" || Date.now() > Number(expires)) throw invalid;
+    if (code !== dto.code) {
+      const n = Number(attempts) + 1;
+      // Five wrong tries burn the code.
+      await this.prisma.user.update({ where: { id: user.id }, data: { verificationToken: n >= 5 ? null : `reset:${code}:${expires}:${n}:${user.id}` } });
+      throw invalid;
+    }
+    await this.security.assertPassword(inst.id, dto.newPassword);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: await bcrypt.hash(dto.newPassword, 10), passwordChangedAt: new Date(), verificationToken: null, failedLoginAttempts: 0, lockedUntil: null },
+    });
+    return { message: "Your password has been changed. Sign in with your new password." };
   }
 
   /** The signed-in learner, if they belong to this academy. */

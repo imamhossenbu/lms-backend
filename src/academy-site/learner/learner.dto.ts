@@ -130,3 +130,21 @@ export class LiveQueryDto {
   @IsIn(["upcoming", "past"])
   when?: "upcoming" | "past";
 }
+
+export class LearnerResetDto {
+  @ApiProperty()
+  @Transform(lower)
+  @IsEmail({}, { message: "Enter a valid email address" })
+  email!: string;
+
+  @ApiProperty()
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: "Enter the 6-digit code from your email" })
+  code!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8, { message: "Use at least 8 characters" })
+  @MaxLength(100)
+  newPassword!: string;
+}
