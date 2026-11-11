@@ -8,6 +8,9 @@
  *
  *   npx ts-node --transpile-only prisma/seed-sample-academy.ts [slug]           # add / refresh (default: edupro-academy)
  *   npx ts-node --transpile-only prisma/seed-sample-academy.ts [slug] --remove  # delete every sample row
+ *   … --password=<pw>   give every sample instructor / learner this password so you can sign in as them
+ *                       (instructors → admin panel teacher mode, learners → academy site). Without it the
+ *                       accounts get a random password and can't sign in.
  */
 import "dotenv/config";
 import { randomBytes } from "crypto";
@@ -373,6 +376,8 @@ async function main() {
   const args = process.argv.slice(2);
   const remove = args.includes("--remove");
   const slug = args.find((a) => !a.startsWith("--")) ?? "edupro-academy";
+  const demoPassword = args.find((a) => a.startsWith("--password="))?.slice("--password=".length) ?? "";
+  if (demoPassword && demoPassword.length < 8) throw new Error("--password must be at least 8 characters");
   const prisma = new PrismaService();
   try {
     const inst = await prisma.institution.findUnique({ where: { slug }, select: { id: true, name: true } });
@@ -382,6 +387,10 @@ async function main() {
     const sampleSite = await prisma.academySite.findUnique({ where: { institutionId: inst.id } });
     const siteIsSample = !!sampleSite && (sampleSite.content as Record<string, unknown> | null)?._sample === true;
     if (siteIsSample) await prisma.academySite.delete({ where: { institutionId: inst.id } });
+    const sampleCourses = (await prisma.course.findMany({ where: { institutionId: inst.id, slug: { startsWith: "sample-" } }, select: { id: true } })).map((c) => c.id);
+    const threads = (await prisma.discussion.findMany({ where: { courseId: { in: sampleCourses } }, select: { id: true } })).map((d) => d.id);
+    await prisma.discussionReply.deleteMany({ where: { discussionId: { in: threads } } });
+    await prisma.discussion.deleteMany({ where: { id: { in: threads } } });
     const del = await prisma.course.deleteMany({ where: { institutionId: inst.id, slug: { startsWith: "sample-" } } });
     await prisma.category.deleteMany({ where: { institutionId: inst.id, slug: { startsWith: "sample-" } } });
     const users = await prisma.user.deleteMany({ where: { email: { endsWith: DOMAIN } } });
@@ -390,7 +399,7 @@ async function main() {
       return;
     }
 
-    const password = await bcrypt.hash(randomBytes(24).toString("hex"), 10);
+    const password = await bcrypt.hash(demoPassword || randomBytes(24).toString("hex"), 10);
     const cats = new Map<string, string>();
     for (const c of CATEGORIES) cats.set(c.slug, (await prisma.category.create({ data: { ...c, institutionId: inst.id, status: "ACTIVE" } })).id);
 
@@ -489,6 +498,15 @@ async function main() {
         }
       }
       await prisma.courseReview.createMany({ data: c.reviews.map(([who, rating, reviewText]) => ({ courseId: course.id, userId: learners[who], rating, reviewText, status: "APPROVED" })) });
+      // Reviewers are enrolled learners (some progress), and one of them asked a question in the course discussion.
+      const reviewers = [...new Set(c.reviews.map(([who]) => who))];
+      await prisma.enrollment.createMany({
+        data: reviewers.map((who, i) => ({ userId: learners[who], courseId: course.id, status: "ACTIVE", progressPercentage: [100, 60, 35, 80][i % 4], completedAt: i % 4 === 0 ? new Date() : null, lastAccessedAt: new Date(Date.now() - i * 86_400_000) })),
+        skipDuplicates: true,
+      });
+      await prisma.discussion.create({
+        data: { institutionId: inst.id, courseId: course.id, userId: learners[reviewers[reviewers.length - 1]], title: `Question about "${c.modules[0][0]}"`, body: "<p>Could you share an extra example for this part? I want to make sure I understood it.</p>", category: "QUESTION" },
+      });
     }
 
     // Website content — never overwrite an academy's own (non-sample) content.
@@ -498,7 +516,8 @@ async function main() {
     console.log(
       `Added ${COURSES.length} sample courses, ${Object.keys(INSTRUCTORS).length} instructors and ${LEARNERS.length} learners to ${inst.name}` +
         (keptOwn ? " (kept the academy's own website content)" : " plus sample website content") +
-        ". Remove with --remove.",
+        ". Remove with --remove." +
+        (demoPassword ? ` Sign-in emails: ${Object.keys(INSTRUCTORS).map((k) => `${k}.instructor${DOMAIN}`).join(", ")} (panel) and e.g. rafiq.ahmed${DOMAIN} (academy site).` : ""),
     );
   } finally {
     await prisma.$disconnect();
