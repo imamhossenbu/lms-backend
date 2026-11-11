@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  BadRequestException,
   Patch,
   Body,
   UseGuards,
@@ -45,6 +47,23 @@ export class UserController {
   async updateProfile(@Req() req: RequestWithUser, @Body() dto: UpdateProfileDto, @UploadedFile() file: Express.Multer.File) {
     const avatarUrl = file ? await this.cloudinaryService.uploadImage(file) : undefined;
     return this.userService.updateProfile(req.user.userId, dto, avatarUrl);
+  }
+
+  /** Profile photo for any signed-in user (learners on the academy site, teachers, admins): JPG / PNG / WebP up to 3 MB. */
+  @Post("avatar")
+  @UseInterceptors(FileInterceptor("avatar", { limits: { fileSize: 3 * 1024 * 1024 } }))
+  async uploadAvatar(@Req() req: RequestWithUser, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException("Choose an image to upload.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) throw new BadRequestException("Use a JPG, PNG or WebP image.");
+    const avatar = await this.cloudinaryService.uploadImage(file);
+    await this.userService.setAvatar(req.user.userId, avatar);
+    return { avatar };
+  }
+
+  @Delete("avatar")
+  async removeAvatar(@Req() req: RequestWithUser) {
+    await this.userService.setAvatar(req.user.userId, null);
+    return { avatar: null };
   }
 
   @Patch("change-password")

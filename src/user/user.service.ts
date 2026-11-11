@@ -41,6 +41,10 @@ export class UserService {
     return safe(await this.prisma.user.update({ where: { id: userId }, data }));
   }
 
+  async setAvatar(userId: string, avatar: string | null) {
+    await this.prisma.user.update({ where: { id: userId }, data: { avatar } });
+  }
+
   async changePassword(userId: string, currentPass: string, newPass: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
