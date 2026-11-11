@@ -17,6 +17,7 @@ export const CatalogId = (kind: CatalogIdKind) => SetMetadata(ID_KIND_KEY, kind)
  *   /lessons/:lessonId/...                 lesson's course must be in the caller's workspace
  *   :id (per @CatalogId)                   module / lesson / resource must belong to the parent in the URL
  * Anything outside the chain is a 404, so ids from other workspaces are indistinguishable from missing ones.
+ * A TEACHER may only reach courses they instruct (other teachers' courses are 404 too).
  */
 @Injectable()
 export class CatalogAccessGuard implements CanActivate {
@@ -28,11 +29,13 @@ export class CatalogAccessGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const tenantId = tenantOf(req.user);
+    // Teachers are confined to their own courses; admins (team permissions) and students (access checks) are not.
+    const own = req.user?.role === "TEACHER" ? { instructorId: req.user.userId as string } : {};
     const { courseId, moduleId, lessonId, id } = req.params as Record<string, string | undefined>;
     const kind = this.reflector.getAllAndOverride<CatalogIdKind>(ID_KIND_KEY, [context.getHandler(), context.getClass()]);
 
     if (courseId) {
-      const course = await this.prisma.course.findFirst({ where: { id: courseId, institutionId: tenantId }, select: { id: true } });
+      const course = await this.prisma.course.findFirst({ where: { id: courseId, institutionId: tenantId, ...own }, select: { id: true } });
       if (!course) throw new NotFoundException("Course not found");
     }
     if (moduleId) {
@@ -40,7 +43,7 @@ export class CatalogAccessGuard implements CanActivate {
       if (!mod) throw new NotFoundException("Module not found");
     }
     if (lessonId) {
-      const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, module: { course: { institutionId: tenantId } } }, select: { id: true } });
+      const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, module: { course: { institutionId: tenantId, ...own } } }, select: { id: true } });
       if (!lesson) throw new NotFoundException("Lesson not found");
     }
 

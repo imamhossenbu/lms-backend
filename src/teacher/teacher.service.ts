@@ -11,7 +11,8 @@ const meta = (total: number, p: number, l: number) => ({ total, page: p, limit: 
 /**
  * Teacher mode of the admin panel: everything is limited to courses where the signed-in TEACHER is the instructor,
  * inside their own workspace. Teachers read their students and results, grade submissions, answer questions and
- * keep their own profile; course building and settings stay with admins.
+ * keep their own profile. Curriculum editing + live scheduling live in TeacherContentService; pricing, publishing
+ * and settings stay with admins.
  */
 @Injectable()
 export class TeacherService {
@@ -235,9 +236,9 @@ export class TeacherService {
       where: { OR: [{ instructorId: userId }, { courseId: { in: courseIds } }], status: { not: "CANCELLED" }, ...(when === "upcoming" ? { endTime: { gt: now } } : { endTime: { lte: now } }) },
       orderBy: { startTime: when === "upcoming" ? "asc" : "desc" },
       take,
-      select: { id: true, title: true, startTime: true, endTime: true, meetingUrl: true, recordingUrl: true, platform: true, course: { select: { title: true } }, _count: { select: { attendances: true } } },
+      select: { id: true, courseId: true, instructorId: true, title: true, startTime: true, endTime: true, meetingUrl: true, recordingUrl: true, platform: true, course: { select: { title: true } }, _count: { select: { attendances: true } } },
     });
-    return rows.map(({ _count, ...r }) => ({ ...r, attendees: _count.attendances, status: now >= r.startTime && now < r.endTime ? "LIVE" : now >= r.endTime ? "ENDED" : "UPCOMING" }));
+    return rows.map(({ _count, instructorId, ...r }) => ({ ...r, mine: instructorId === userId, attendees: _count.attendances, status: now >= r.startTime && now < r.endTime ? "LIVE" : now >= r.endTime ? "ENDED" : "UPCOMING" }));
   }
 
   async liveClasses(userId: string, tenantId: string | null, when: "upcoming" | "past") {
