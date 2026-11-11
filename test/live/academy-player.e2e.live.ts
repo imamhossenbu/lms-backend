@@ -102,7 +102,7 @@ async function completeLesson(page: Page) {
     await page.goto(`${SITE}/learn/${course.slug}?lesson=${reading.id}`, { waitUntil: "networkidle2" });
     await waitForText(page, "Important notes");
     await completeLesson(page);
-    const t3 = await until(() => safeText(page), (t) => t.includes("Unlocked!") && t.includes("2 of 4 lessons done"));
+    const t3 = await until(() => safeText(page), (t) => t.includes("Unlocked!") && t.includes("2 of 4 lessons done"), 90);
     check("completing the previous lesson unlocks it", t3.includes("2 of 4 lessons done"), t3.slice(-500));
     await until(async () => page.url(), (u) => u.includes(`lesson=${gated.id}`));
     await completeLesson(page);

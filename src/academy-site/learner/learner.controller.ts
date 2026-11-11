@@ -9,7 +9,7 @@ import { AcademyCheckoutService } from "./academy-checkout.service";
 import { LearnerAuthService } from "./learner-auth.service";
 import { LearnerPlayerService } from "./learner-player.service";
 import { LearnerDashboardService } from "./learner-dashboard.service";
-import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerPasswordDto, LearnerProfileDto, LearnerRegisterDto, LearnerResetDto, LearnerVerifyDto, LiveQueryDto, StartCheckoutDto } from "./learner.dto";
+import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerPasswordDto, LearnerProfileDto, LearnerRegisterDto, LearnerResetDto, LearnerVerifyDto, LiveQueryDto, StartCheckoutDto, VideoPositionDto, AskQuestionDto, ReplyQuestionDto } from "./learner.dto";
 
 /** Learner sign-up / sign-in on an academy's website (the site calls these from its own server). */
 @ApiTags("Academy site · Learners")
@@ -136,6 +136,33 @@ export class LearnerMeController {
   @ApiOperation({ summary: "Mark a lesson complete → fresh outline (progress, certificate auto-issue)" })
   complete(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Param("lessonId", ParseUUIDPipe) lessonId: string, @Req() req: RequestWithUser) {
     return this.player.complete(slug, req.user.userId, courseSlug, lessonId);
+  }
+
+  @Patch("learn/:courseSlug/lessons/:lessonId/position")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: "Remember where the learner stopped a video (seconds)" })
+  position(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Param("lessonId", ParseUUIDPipe) lessonId: string, @Body() dto: VideoPositionDto, @Req() req: RequestWithUser) {
+    return this.player.savePosition(slug, req.user.userId, courseSlug, lessonId, dto.seconds);
+  }
+
+  @Get("learn/:courseSlug/questions")
+  @ApiOperation({ summary: "Course Q&A: learners' questions with replies (instructors flagged)" })
+  questions(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Req() req: RequestWithUser) {
+    return this.player.questions(slug, req.user.userId, courseSlug);
+  }
+
+  @Post("learn/:courseSlug/questions")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: "Ask a question in the course (shows in the teacher's Q&A)" })
+  ask(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Body() dto: AskQuestionDto, @Req() req: RequestWithUser) {
+    return this.player.ask(slug, req.user.userId, courseSlug, dto.title, dto.body);
+  }
+
+  @Post("learn/:courseSlug/questions/:id/reply")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  reply(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Param("id", ParseUUIDPipe) id: string, @Body() dto: ReplyQuestionDto, @Req() req: RequestWithUser) {
+    return this.player.replyTo(slug, req.user.userId, courseSlug, id, dto.body);
   }
 
   // ---------------------------------------------------------------- dashboard

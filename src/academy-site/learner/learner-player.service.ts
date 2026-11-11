@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { EnrollmentService } from "../../enrollment/enrollment.service";
 import { lessonGate } from "../../lession/lesson-gate";
 import { PrismaService } from "../../prisma/prisma.service";
+import { sanitizeRichText } from "../../common/html";
 import { LearnerAuthService } from "./learner-auth.service";
 
 export interface PlayerLesson {
@@ -121,7 +122,115 @@ export class LearnerPlayerService {
       throw new ForbiddenException({ statusCode: 403, code: `LESSON_${gate.reason}`, message: gate.message });
     }
     const { lessonResources, ...rest } = lesson;
-    return { ...rest, resources: lessonResources, completed: !!progress?.isCompleted, lastPosition: progress?.lastPosition ?? 0, quizId: lesson.type === "QUIZ" ? (quiz?.id ?? null) : null };
+    const [assignment, live] = await Promise.all([lesson.type === "ASSIGNMENT" ? this.lessonAssignment(userId, lessonId) : null, lesson.type === "LIVE" ? this.nextLive(course.id) : null]);
+    return { ...rest, resources: lessonResources, completed: !!progress?.isCompleted, lastPosition: progress?.lastPosition ?? 0, quizId: lesson.type === "QUIZ" ? (quiz?.id ?? null) : null, assignment, live };
+  }
+
+  /** The published assignment attached to an ASSIGNMENT lesson, with this learner's latest submission. */
+  private async lessonAssignment(userId: string, lessonId: string) {
+    const now = new Date();
+    const a = await this.prisma.assignment.findFirst({
+      where: { lessonId, status: "PUBLISHED", OR: [{ releaseAt: null }, { releaseAt: { lte: now } }] },
+      select: {
+        id: true, title: true, type: true, dueDate: true, marks: true, instructionsHtml: true, description: true, allowedFileTypes: true, maxFileSizeMb: true, maxAttempts: true, lateSubmission: true,
+        submissions: { where: { userId }, orderBy: { submittedAt: "desc" }, select: { id: true, status: true, submittedAt: true, marksObtained: true, feedback: true, attempt: true, isLate: true, fileUrl: true, fileName: true, textAnswer: true } },
+      },
+    });
+    if (!a) return null;
+    const { submissions, ...rest } = a;
+    const last = submissions[0] ?? null;
+    const attemptsLeft = a.maxAttempts === null ? null : Math.max(0, a.maxAttempts - submissions.length);
+    return {
+      ...rest,
+      state: last ? (last.status === "GRADED" ? "GRADED" : "SUBMITTED") : now > a.dueDate ? "OVERDUE" : "TODO",
+      attempts: submissions.length,
+      attemptsLeft,
+      canSubmit: (attemptsLeft === null || attemptsLeft > 0) && !(now > a.dueDate && a.lateSubmission === "DISALLOW"),
+      lastSubmission: last,
+    };
+  }
+
+  /** The course's next (or current) live class; the meeting link only from 15 minutes before it starts. */
+  private async nextLive(courseId: string) {
+    const now = new Date();
+    const r = await this.prisma.liveClass.findFirst({
+      where: { courseId, status: { not: "CANCELLED" }, endTime: { gt: now } },
+      orderBy: { startTime: "asc" },
+      select: { id: true, title: true, startTime: true, endTime: true, meetingUrl: true, sendLinkToStudents: true },
+    });
+    if (!r) return null;
+    const joinable = r.sendLinkToStudents && now.getTime() >= r.startTime.getTime() - 15 * 60_000;
+    return { id: r.id, title: r.title, startTime: r.startTime, endTime: r.endTime, status: now >= r.startTime ? "LIVE" : "UPCOMING", joinUrl: joinable ? r.meetingUrl : null };
+  }
+
+  /** Remembers where the learner stopped a video (seconds). */
+  async savePosition(slug: string, userId: string, courseSlug: string, lessonId: string, seconds: number) {
+    const { course } = await this.enrolledCourse(slug, userId, courseSlug);
+    const lesson = await this.prisma.lesson.findFirst({ where: { id: lessonId, courseId: course.id }, select: { id: true } });
+    if (!lesson) throw new NotFoundException("Lesson not found");
+    const s = Math.max(0, Math.min(Math.round(seconds), 24 * 3600));
+    await this.prisma.lessonProgress.upsert({
+      where: { userId_lessonId: { userId, lessonId } },
+      update: { lastPosition: s, watchedSeconds: { increment: 0 } },
+      create: { userId, lessonId, courseId: course.id, isCompleted: false, watchedSeconds: 0, lastPosition: s },
+    });
+    return { lastPosition: s };
+  }
+
+  // ---------------------------------------------------------------- course Q&A (community QUESTION threads)
+
+  async questions(slug: string, userId: string, courseSlug: string) {
+    const { course } = await this.enrolledCourse(slug, userId, courseSlug);
+    const rows = await this.prisma.discussion.findMany({
+      where: { courseId: course.id, category: "QUESTION", isHidden: false },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: { id: true, title: true, body: true, isResolved: true, isLocked: true, createdAt: true, userId: true, replies: { where: { isRemoved: false }, orderBy: { createdAt: "asc" }, select: { id: true, body: true, userId: true, isAccepted: true, createdAt: true } } },
+    });
+    const ids = [...new Set(rows.flatMap((r) => [r.userId, ...r.replies.map((x) => x.userId)]))];
+    const users = await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, avatar: true, role: true } });
+    const who = (id: string) => {
+      const u = users.find((x) => x.id === id);
+      return { name: u?.name ?? "Learner", avatar: u?.avatar ?? null, isInstructor: u?.role === "TEACHER" || u?.role === "ADMIN", isMe: id === userId };
+    };
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      bodyHtml: r.body,
+      isResolved: r.isResolved,
+      isLocked: r.isLocked,
+      createdAt: r.createdAt,
+      author: who(r.userId),
+      replies: r.replies.map((x) => ({ id: x.id, bodyHtml: x.body, isAccepted: x.isAccepted, createdAt: x.createdAt, author: who(x.userId) })),
+    }));
+  }
+
+  private toHtml(text: string) {
+    const esc = text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+    return sanitizeRichText(`<p>${esc.replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>")}</p>`);
+  }
+
+  async ask(slug: string, userId: string, courseSlug: string, title: string, body: string) {
+    const { course } = await this.enrolledCourse(slug, userId, courseSlug);
+    const inst = await this.prisma.course.findUniqueOrThrow({ where: { id: course.id }, select: { institutionId: true } });
+    const row = await this.prisma.discussion.create({
+      data: { institutionId: inst.institutionId, courseId: course.id, userId, title: title.trim(), body: this.toHtml(body.trim()), category: "QUESTION", updatedAt: new Date() },
+      select: { id: true },
+    });
+    return row;
+  }
+
+  async replyTo(slug: string, userId: string, courseSlug: string, discussionId: string, body: string) {
+    const { course } = await this.enrolledCourse(slug, userId, courseSlug);
+    const thread = await this.prisma.discussion.findFirst({ where: { id: discussionId, courseId: course.id, isHidden: false }, select: { id: true, isLocked: true } });
+    if (!thread) throw new NotFoundException("Question not found");
+    if (thread.isLocked) throw new ForbiddenException("This question is closed for replies.");
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.discussionReply.create({ data: { discussionId, userId, body: this.toHtml(body.trim()), createdAt: now } }),
+      this.prisma.discussion.update({ where: { id: discussionId }, data: { updatedAt: now } }),
+    ]);
+    return { ok: true };
   }
 
   async complete(slug: string, userId: string, courseSlug: string, lessonId: string) {

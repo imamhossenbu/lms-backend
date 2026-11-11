@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { IsEmail, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim() : value);
 const lower = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim().toLowerCase() : value);
@@ -147,4 +147,17 @@ export class LearnerResetDto {
   @MinLength(8, { message: "Use at least 8 characters" })
   @MaxLength(100)
   newPassword!: string;
+}
+
+export class VideoPositionDto {
+  @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) @Max(86_400) seconds!: number;
+}
+
+export class AskQuestionDto {
+  @ApiProperty() @Transform(trim) @IsString() @MinLength(5, { message: "Give your question a short title" }) @MaxLength(150, { message: "Keep the title under 150 characters" }) title!: string;
+  @ApiProperty() @Transform(trim) @IsString() @MinLength(10, { message: "Describe your question (at least 10 characters)" }) @MaxLength(5000, { message: "Your question is too long" }) body!: string;
+}
+
+export class ReplyQuestionDto {
+  @ApiProperty() @Transform(trim) @IsString() @MinLength(2, { message: "Write your reply" }) @MaxLength(5000, { message: "Your reply is too long" }) body!: string;
 }
