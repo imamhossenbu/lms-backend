@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { DEFAULT_CERT_BODY, DEFAULT_CERT_HEADING, renderCertificatePdf } from "../../certificates/certificate-pdf";
 import { AuthService } from "../../auth/auth.service";
 import { verifyUrl } from "../../certificates/certificates.constants";
 import { statusLabel } from "../../commerce/order-status";
@@ -167,6 +168,45 @@ export class LearnerDashboardService {
       select: { id: true, certificateNumber: true, verificationCode: true, certificateUrl: true, issuedAt: true, status: true, grade: true, expiresAt: true, course: { select: { slug: true, title: true, thumbnail: true } } },
     });
     return rows.map((r) => ({ ...r, verifyUrl: verifyUrl(r.verificationCode), certificateUrl: r.certificateUrl || null }));
+  }
+
+  /** The learner's own certificate as a PDF (revoked ones are refused; expired ones carry an EXPIRED stamp). */
+  async certificatePdf(slug: string, userId: string, id: string) {
+    const { inst, user } = await this.scope(slug, userId);
+    const cert = await this.prisma.certificate.findFirst({
+      where: { id, userId, course: { institutionId: inst.id } },
+      include: { template: true, course: { select: { title: true, slug: true, instructor: { select: { name: true } } } } },
+    });
+    if (!cert) throw new NotFoundException("Certificate not found");
+    if (cert.status === "REVOKED") throw new ForbiddenException("This certificate has been revoked. Contact the academy for details.");
+    const t = cert.template;
+    const signers = Array.isArray(t?.signers)
+      ? (t.signers as { name?: unknown; title?: unknown }[]).filter((s) => typeof s?.name === "string" && s.name).map((s) => ({ name: String(s.name), title: String(s.title ?? "") }))
+      : [];
+    const expired = !!cert.expiresAt && cert.expiresAt.getTime() < Date.now();
+    const pdf = await renderCertificatePdf({
+      academyName: inst.name,
+      heading: t?.heading || DEFAULT_CERT_HEADING,
+      bodyText: t?.bodyText || DEFAULT_CERT_BODY,
+      studentName: user.name,
+      courseTitle: cert.course.title,
+      instructorName: cert.course.instructor?.name ?? inst.name,
+      completedAt: cert.completedAt ?? cert.issuedAt,
+      certificateNumber: cert.certificateNumber,
+      grade: cert.grade,
+      showGrade: t?.showGrade ?? false,
+      showQr: t?.showQr ?? true,
+      verifyUrl: verifyUrl(cert.verificationCode),
+      accent: t?.accent ?? "orange",
+      orientation: t?.orientation ?? "LANDSCAPE",
+      signers,
+      stamp: expired ? "EXPIRED" : null,
+    });
+    await this.prisma.$transaction([
+      this.prisma.certificate.update({ where: { id }, data: { downloads: { increment: 1 } } }),
+      this.prisma.certificateEvent.create({ data: { certificateId: id, kind: "DOWNLOADED", message: "Downloaded by learner", actorName: user.name, actorId: user.id } }),
+    ]);
+    return { pdf, filename: `${cert.course.slug}-certificate.pdf` };
   }
 
   async orders(slug: string, userId: string) {

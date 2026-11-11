@@ -1,8 +1,8 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { ValidateDto } from "../../common/auth-user";
 import type { RequestWithUser } from "../../auth/interfaces/request.interface";
 import { AcademyCheckoutService } from "./academy-checkout.service";
@@ -195,6 +195,14 @@ export class LearnerMeController {
   @ApiOperation({ summary: "The learner's certificates with verify links" })
   certificates(@Param("slug") slug: string, @Req() req: RequestWithUser) {
     return this.dashboard.certificates(slug, req.user.userId);
+  }
+
+  @Get("certificates/:id/pdf")
+  @ApiOperation({ summary: "Download the learner's own certificate as a PDF" })
+  async certificatePdf(@Param("slug") slug: string, @Param("id", ParseUUIDPipe) id: string, @Req() req: RequestWithUser, @Res() res: Response) {
+    const { pdf, filename } = await this.dashboard.certificatePdf(slug, req.user.userId, id);
+    res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${filename}"`, "Cache-Control": "private, no-store" });
+    res.send(pdf);
   }
 
   @Get("orders")
