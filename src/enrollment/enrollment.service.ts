@@ -161,19 +161,20 @@ export class EnrollmentService {
   }
 
   async calculateAndSaveProgress(userId: string, courseId: string) {
+    // Only lessons students can see count (drafts would make 100% unreachable).
     const totalLessons = await this.prisma.lesson.count({
-      where: { courseId },
+      where: { courseId, status: "PUBLISHED" },
     });
 
     const completedLessons = await this.prisma.lessonProgress.count({
-      where: { userId, courseId, isCompleted: true },
+      where: { userId, courseId, isCompleted: true, lesson: { status: "PUBLISHED" } },
     });
 
     if (totalLessons === 0) return 0;
 
-    const progressPercentage = Math.round(
+    const progressPercentage = Math.min(100, Math.round(
       (completedLessons / totalLessons) * 100,
-    );
+    ));
 
     const isComplete = progressPercentage === 100;
 

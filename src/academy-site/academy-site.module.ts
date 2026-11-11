@@ -3,6 +3,7 @@ import { AuthModule } from "../auth/auth.module";
 import { MailService } from "../auth/mail/mail.service";
 import { CommerceModule } from "../commerce/commerce.module";
 import { InvoiceModule } from "../invoice/invoice.module";
+import { EnrollmentModule } from "../enrollment/enrollment.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { WorkspaceSettingsModule } from "../workspace-settings/workspace-settings.module";
 import { AcademySiteService } from "./academy-site.service";
@@ -13,6 +14,7 @@ import { AcademyCheckoutCallbackController } from "./learner/academy-checkout-ca
 import { AcademyCheckoutService } from "./learner/academy-checkout.service";
 import { LearnerAuthController, LearnerMeController } from "./learner/learner.controller";
 import { LearnerAuthService } from "./learner/learner-auth.service";
+import { LearnerPlayerService } from "./learner/learner-player.service";
 
 /**
  * Public data for each academy's own website (lms-academy-site, port 3003):
@@ -22,13 +24,14 @@ import { LearnerAuthService } from "./learner/learner-auth.service";
  *   GET /academy/public/:slug/levels       filter options           GET …/instructors, …/reviews
  * Learners (learner/):
  *   POST /academy/public/:slug/auth/register|verify|resend|login   learner accounts (STUDENT of that academy)
- *   /academy/:slug/me (JWT)   GET me, courses/:courseSlug/access, checkout/:courseSlug (quote), POST checkout, orders/:id
+ *   /academy/:slug/me (JWT)   GET me, courses/:courseSlug/access, checkout/:courseSlug (quote), POST checkout, orders/:id,
+ *                             learn/:courseSlug (player outline), learn/:courseSlug/lessons/:id (+ POST …/complete)
  *   POST /academy/checkout/sslcommerz/success|fail|cancel|ipn   gateway callbacks → 303 to the academy site
  * Admin panel › Website (admin/): /admin/website GET|PATCH content, /admin/website/subscribers (+ export, :id PATCH|DELETE)
  */
 @Module({
-  imports: [PrismaModule, WorkspaceSettingsModule, AuthModule, CommerceModule, InvoiceModule],
+  imports: [PrismaModule, WorkspaceSettingsModule, AuthModule, CommerceModule, InvoiceModule, EnrollmentModule],
   controllers: [PublicAcademyController, LearnerAuthController, LearnerMeController, AcademyCheckoutCallbackController, AdminWebsiteController],
-  providers: [AcademySiteService, LearnerAuthService, AcademyCheckoutService, MailService, AdminWebsiteService],
+  providers: [AcademySiteService, LearnerAuthService, AcademyCheckoutService, MailService, AdminWebsiteService, LearnerPlayerService],
 })
 export class AcademySiteModule {}

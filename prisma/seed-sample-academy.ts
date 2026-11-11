@@ -18,6 +18,62 @@ const DOMAIN = "@sample.edupro.invalid";
 const img = (id: string) => `https://images.unsplash.com/${id}?w=1200&q=80&auto=format&fit=crop`;
 const face = (id: string) => `https://images.unsplash.com/${id}?w=256&h=256&q=80&auto=format&fit=crop&crop=faces`;
 
+/** Free stock clips (Pexels licence) used as sample lesson videos. */
+const VIDEOS = [
+  "https://videos.pexels.com/video-files/6985689/6985689-hd_1920_1080_25fps.mp4",
+  "https://videos.pexels.com/video-files/3209828/3209828-hd_1920_1080_25fps.mp4",
+  "https://videos.pexels.com/video-files/5495845/5495845-hd_1920_1080_30fps.mp4",
+];
+
+/** Sample lesson body for every lesson type (rich text, as the course builder saves it). */
+function lessonBody(title: string, type: string, course: string): string {
+  const intro = `<p>In <strong>${title}</strong> you take one focused step in <em>${course}</em>. Work through it at your own pace and come back whenever you need a refresher.</p>`;
+  switch (type) {
+    case "VIDEO":
+      return `${intro}<h3>Key takeaways</h3><ul><li>Watch the full video once without pausing.</li><li>Re-watch the parts you want to practise and follow along.</li><li>Write down one question to bring to the next live session.</li></ul>`;
+    case "TEXT":
+      return `${intro}<h3>Read this first</h3><p>Good learners don't try to memorise everything. They understand the idea, try it, and then look things up when they need them.</p><ol><li>Skim the whole lesson.</li><li>Read it again slowly and try each example.</li><li>Explain it to yourself in one sentence.</li></ol><blockquote>Tip: short daily practice beats one long session per week.</blockquote>`;
+    case "CODING":
+      return `${intro}<h3>Your task</h3><p>Build the exercise described below on your own computer, then compare it with the starter files in the resources.</p><pre><code>// Start here\nfunction solve(input) {\n  // your code\n}\n</code></pre><p>When it works, mark this lesson as complete.</p>`;
+    case "ASSIGNMENT":
+      return `${intro}<h3>Assignment brief</h3><p>Create the deliverable described in this lesson and share it in the course discussion for feedback.</p><ul><li>Follow the checklist in the resources.</li><li>Keep it simple — finished beats perfect.</li><li>Mark the lesson complete when you've shared it.</li></ul>`;
+    case "LIVE":
+      return `${intro}<h3>Live session</h3><p>This lesson is a live class with your instructor. The schedule is announced in the course a week ahead, and the recording is added here afterwards.</p><ul><li>Bring your questions.</li><li>Keep your project open so we can review it together.</li></ul>`;
+    default:
+      return intro;
+  }
+}
+
+type SampleQuestion = { kind: "MULTIPLE_CHOICE" | "MULTIPLE_SELECT" | "TRUE_FALSE"; text: string; options: string[]; correct: number[]; explanation: string };
+/** Questions for the QUIZ lessons, by course slug. */
+const QUIZZES: Record<string, SampleQuestion[]> = {
+  "sample-complete-web-development": [
+    { kind: "MULTIPLE_CHOICE", text: "Which keyword declares a variable that can't be reassigned?", options: ["var", "let", "const", "static"], correct: [2], explanation: "const creates a binding that can't be reassigned." },
+    { kind: "TRUE_FALSE", text: "Arrays in JavaScript can hold values of different types.", options: ["True", "False"], correct: [0], explanation: "An array can mix numbers, strings, objects and more." },
+    { kind: "MULTIPLE_SELECT", text: "Which of these are DOM events?", options: ["click", "submit", "deploy", "input"], correct: [0, 1, 3], explanation: "deploy isn't a DOM event." },
+  ],
+  "sample-react-nextjs-masterclass": [
+    { kind: "MULTIPLE_CHOICE", text: "Which hook stores state in a function component?", options: ["useEffect", "useState", "useMemo", "useRef"], correct: [1], explanation: "useState returns the value and a setter." },
+    { kind: "TRUE_FALSE", text: "Server components can use useState.", options: ["True", "False"], correct: [1], explanation: "Hooks with state only run in client components." },
+    { kind: "MULTIPLE_CHOICE", text: "In the App Router, which file defines a route's UI?", options: ["index.tsx", "route.tsx", "page.tsx", "view.tsx"], correct: [2], explanation: "page.tsx makes a route publicly accessible." },
+  ],
+  "sample-python-for-beginners": [
+    { kind: "MULTIPLE_CHOICE", text: "What does print(3 * 'ab') show?", options: ["3ab", "ababab", "Error", "ab3"], correct: [1], explanation: "Multiplying a string repeats it." },
+    { kind: "TRUE_FALSE", text: "Python uses indentation to group code blocks.", options: ["True", "False"], correct: [0], explanation: "Indentation defines blocks in Python." },
+    { kind: "MULTIPLE_CHOICE", text: "Which loop runs while a condition is true?", options: ["for", "while", "repeat", "loop"], correct: [1], explanation: "while keeps looping until the condition becomes false." },
+  ],
+  "sample-data-analysis-python-excel": [
+    { kind: "MULTIPLE_CHOICE", text: "Which Excel feature summarises data by category quickly?", options: ["VLOOKUP", "Pivot table", "Freeze panes", "Flash fill"], correct: [1], explanation: "Pivot tables group and summarise data." },
+    { kind: "TRUE_FALSE", text: "Cleaning data usually comes before analysing it.", options: ["True", "False"], correct: [0], explanation: "Messy data gives misleading results." },
+    { kind: "MULTIPLE_SELECT", text: "Which are good chart choices for comparing categories?", options: ["Bar chart", "Column chart", "Pie chart with 15 slices", "Line chart over time"], correct: [0, 1], explanation: "Bars and columns compare categories clearly." },
+  ],
+  "sample-digital-marketing-mastery": [
+    { kind: "MULTIPLE_CHOICE", text: "What should you define before running any ad?", options: ["Font size", "Target audience and goal", "Logo colour", "Posting time only"], correct: [1], explanation: "Audience and goal decide everything else." },
+    { kind: "TRUE_FALSE", text: "A higher click-through rate always means more sales.", options: ["True", "False"], correct: [1], explanation: "Clicks don't guarantee purchases — check conversions." },
+    { kind: "MULTIPLE_CHOICE", text: "SEO mainly improves…", options: ["Paid ad reach", "Organic search visibility", "Email open rates", "Video quality"], correct: [1], explanation: "SEO helps you rank in unpaid search results." },
+  ],
+};
+
 const CATEGORIES = [
   { slug: "sample-web-app", name: "Web & App Development", icon: "code" },
   { slug: "sample-programming-data", name: "Programming & Data", icon: "data" },
@@ -377,11 +433,60 @@ async function main() {
           totalStudents: c.students,
         },
       });
+      let v = 0;
       for (const [mi, [title, lessons]] of c.modules.entries()) {
         const mod = await prisma.courseModule.create({ data: { courseId: course.id, title, order: mi + 1, durationMinutes: lessons.reduce((s, l) => s + l[2], 0) } });
-        await prisma.lesson.createMany({
-          data: lessons.map(([t, type, durationMinutes, preview], li) => ({ courseId: course.id, moduleId: mod.id, title: t, type, durationMinutes, order: li + 1, isPreview: !!preview, status: "PUBLISHED" })),
-        });
+        for (const [li, [t, type, durationMinutes, preview]] of lessons.entries()) {
+          const lesson = await prisma.lesson.create({
+            data: {
+              courseId: course.id,
+              moduleId: mod.id,
+              title: t,
+              type,
+              durationMinutes,
+              order: li + 1,
+              isPreview: !!preview,
+              status: "PUBLISHED",
+              content: lessonBody(t, type, c.title),
+              videoUrl: type === "VIDEO" ? VIDEOS[v++ % VIDEOS.length] : null,
+            },
+          });
+          if (type !== "QUIZ" || !QUIZZES[c.slug]) continue;
+          const qs = QUIZZES[c.slug];
+          await prisma.quiz.create({
+            data: {
+              institutionId: inst.id,
+              courseId: course.id,
+              moduleId: mod.id,
+              lessonId: lesson.id,
+              title: t,
+              description: `Check what you learned in "${title}".`,
+              instructionsHtml: "<p>Answer every question, then submit. You can try again if you don't pass.</p>",
+              passingScore: Math.ceil(qs.length * 10 * 0.6),
+              totalMarks: qs.length * 10,
+              status: "PUBLISHED",
+              showImmediately: true,
+              showCorrectAnswers: true,
+              showExplanation: true,
+              createdByName: INSTRUCTORS[c.teacher].name,
+              questions: {
+                create: qs.map((q, qi) => {
+                  const options = q.options.map((text, oi) => ({ id: `o${oi + 1}`, text }));
+                  return {
+                    questionText: q.text,
+                    questionType: q.kind,
+                    options: JSON.stringify(options),
+                    correctAnswer: "",
+                    correctOptionIds: q.correct.map((i) => options[i].id),
+                    marks: 10,
+                    explanation: q.explanation,
+                    order: qi + 1,
+                  };
+                }),
+              },
+            },
+          });
+        }
       }
       await prisma.courseReview.createMany({ data: c.reviews.map(([who, rating, reviewText]) => ({ courseId: course.id, userId: learners[who], rating, reviewText, status: "APPROVED" })) });
     }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -7,6 +7,7 @@ import { ValidateDto } from "../../common/auth-user";
 import type { RequestWithUser } from "../../auth/interfaces/request.interface";
 import { AcademyCheckoutService } from "./academy-checkout.service";
 import { LearnerAuthService } from "./learner-auth.service";
+import { LearnerPlayerService } from "./learner-player.service";
 import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerRegisterDto, LearnerVerifyDto, StartCheckoutDto } from "./learner.dto";
 
 /** Learner sign-up / sign-in on an academy's website (the site calls these from its own server). */
@@ -58,6 +59,7 @@ export class LearnerMeController {
   constructor(
     private readonly learners: LearnerAuthService,
     private readonly checkout: AcademyCheckoutService,
+    private readonly player: LearnerPlayerService,
   ) {}
 
   @Get()
@@ -95,5 +97,26 @@ export class LearnerMeController {
   @ApiOperation({ summary: "Outcome of a checkout for the result page" })
   result(@Param("slug") slug: string, @Param("orderId") orderId: string, @Req() req: RequestWithUser) {
     return this.checkout.result(slug, req.user.userId, orderId.slice(0, 64));
+  }
+
+  // ---------------------------------------------------------------- course player
+
+  @Get("learn/:courseSlug")
+  @ApiOperation({ summary: "Course player outline: modules, lessons with completed / locked state, progress, next lesson" })
+  outline(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Req() req: RequestWithUser) {
+    return this.player.outline(slug, req.user.userId, courseSlug);
+  }
+
+  @Get("learn/:courseSlug/lessons/:lessonId")
+  @ApiOperation({ summary: "One lesson's content, visible resources and the learner's progress (gated)" })
+  lesson(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Param("lessonId", ParseUUIDPipe) lessonId: string, @Req() req: RequestWithUser) {
+    return this.player.lesson(slug, req.user.userId, courseSlug, lessonId);
+  }
+
+  @Post("learn/:courseSlug/lessons/:lessonId/complete")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Mark a lesson complete → fresh outline (progress, certificate auto-issue)" })
+  complete(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Param("lessonId", ParseUUIDPipe) lessonId: string, @Req() req: RequestWithUser) {
+    return this.player.complete(slug, req.user.userId, courseSlug, lessonId);
   }
 }
