@@ -19,6 +19,6 @@ import { TwoFactorService } from "./two-factor.service";
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, MailService, TwoFactorService],
-  exports: [TwoFactorService],
+  exports: [TwoFactorService, AuthService],
 })
 export class AuthModule {}

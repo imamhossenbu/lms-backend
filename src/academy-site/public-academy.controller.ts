@@ -17,7 +17,7 @@ export class PublicAcademyController {
   constructor(private readonly academy: AcademySiteService) {}
 
   @Get("resolve")
-  @ApiOperation({ summary: "Find the academy for a host: <slug>.<ACADEMY_ROOT_DOMAIN> or a verified custom domain" })
+  @ApiOperation({ summary: "Find the academy for a host: <slug>.<SAAS_ROOT_DOMAIN> or a verified custom domain" })
   resolve(@Query() q: ResolveAcademyQueryDto) {
     return this.academy.resolveHost(q.host);
   }

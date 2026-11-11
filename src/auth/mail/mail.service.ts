@@ -338,6 +338,26 @@ export class MailService {
   // ORDER RECEIPT
   // ===============================
 
+  /** Academy website sign-up: 6-digit code, branded with the academy's name (no panel link). */
+  async sendAcademyVerificationCode(email: string, name: string, code: string, academyName: string) {
+    const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+    const content = `
+      <tr>
+        <td style="padding: 32px 36px 24px 36px;">
+          <h1 style="margin: 0 0 12px; font-size: 20px; color: #0F172A;">Hi ${escape(name)}, confirm your email</h1>
+          <p style="margin: 0 0 20px; color: #52525b; font-size: 15px; line-height: 1.7;">Enter this code on ${escape(academyName)} to finish creating your account.</p>
+          <div style="text-align: center; background: #FFF4ED; border: 1.5px dashed #FF5B00; border-radius: 12px; padding: 16px 20px; font-size: 30px; font-weight: 700; letter-spacing: 8px; color: #0F172A;">${escape(code)}</div>
+          <p style="margin: 20px 0 0; color: #94a3b8; font-size: 13px;">If you didn't sign up, you can ignore this email.</p>
+        </td>
+      </tr>`;
+    await this.transporter.sendMail({
+      from: `"${academyName.replace(/"/g, "")}" <${this.fromEmail}>`,
+      to: email,
+      subject: `${code} is your ${academyName} verification code`,
+      html: this.wrapTemplate(content, "#F97316"),
+    });
+  }
+
   async sendOrderReceiptEmail(email: string, name: string, orderNumber: string, courseTitle: string, amount: number, currency: string, invoiceUrl: string) {
     const escape = (v: string) => v.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
     const total = `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

@@ -320,7 +320,8 @@ export class AuthService {
   }
 
   /** Records the sign-in and returns the access token. */
-  private async issueSession(user: { id: string; email: string; role: string; institutionId: string | null; twoFactorEnabled: boolean }, ip?: string) {
+  /** Access token for a user who has passed every sign-in check (also used by the academy website's sign-up). */
+  async issueSession(user: { id: string; email: string; role: string; institutionId: string | null; twoFactorEnabled: boolean }, ip?: string) {
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date(), lastActiveAt: new Date(), failedLoginAttempts: 0, lockedUntil: null, ...(ip ? { lastLoginIp: ip } : {}) },

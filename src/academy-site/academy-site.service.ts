@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "../../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+import { SAAS_ROOT_DOMAIN } from "../saas/saas.constants";
 import { WorkspaceSettingsReader } from "../workspace-settings/services/workspace-settings-reader.service";
 import type { AcademyCoursesQueryDto } from "./dto/academy-query.dto";
 import {
@@ -38,10 +39,10 @@ export class AcademySiteService {
 
   // ------------------------------------------------------------------ tenant
 
-  /** Host → slug: `<slug>.<ACADEMY_ROOT_DOMAIN>` or a verified custom domain. */
+  /** Host → slug: `<slug>.<SAAS_ROOT_DOMAIN>` or a verified custom domain. */
   async resolveHost(rawHost: string): Promise<{ slug: string }> {
     const host = rawHost.trim().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
-    const root = (process.env.ACADEMY_ROOT_DOMAIN ?? "").trim().toLowerCase();
+    const root = (process.env.SAAS_ROOT_DOMAIN || SAAS_ROOT_DOMAIN).trim().toLowerCase();
     if (root && host.endsWith(`.${root}`)) {
       const sub = host.slice(0, -(root.length + 1));
       if (sub && !sub.includes(".")) {
