@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -8,7 +8,8 @@ import type { RequestWithUser } from "../../auth/interfaces/request.interface";
 import { AcademyCheckoutService } from "./academy-checkout.service";
 import { LearnerAuthService } from "./learner-auth.service";
 import { LearnerPlayerService } from "./learner-player.service";
-import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerRegisterDto, LearnerVerifyDto, StartCheckoutDto } from "./learner.dto";
+import { LearnerDashboardService } from "./learner-dashboard.service";
+import { CheckoutQuoteQueryDto, LearnerEmailDto, LearnerLoginDto, LearnerPasswordDto, LearnerProfileDto, LearnerRegisterDto, LearnerVerifyDto, LiveQueryDto, StartCheckoutDto } from "./learner.dto";
 
 /** Learner sign-up / sign-in on an academy's website (the site calls these from its own server). */
 @ApiTags("Academy site · Learners")
@@ -60,6 +61,7 @@ export class LearnerMeController {
     private readonly learners: LearnerAuthService,
     private readonly checkout: AcademyCheckoutService,
     private readonly player: LearnerPlayerService,
+    private readonly dashboard: LearnerDashboardService,
   ) {}
 
   @Get()
@@ -118,5 +120,63 @@ export class LearnerMeController {
   @ApiOperation({ summary: "Mark a lesson complete → fresh outline (progress, certificate auto-issue)" })
   complete(@Param("slug") slug: string, @Param("courseSlug") courseSlug: string, @Param("lessonId", ParseUUIDPipe) lessonId: string, @Req() req: RequestWithUser) {
     return this.player.complete(slug, req.user.userId, courseSlug, lessonId);
+  }
+
+  // ---------------------------------------------------------------- dashboard
+
+  @Get("dashboard")
+  @ApiOperation({ summary: "Dashboard overview: stats, continue learning, next live classes, recent quiz results" })
+  overview(@Param("slug") slug: string, @Req() req: RequestWithUser) {
+    return this.dashboard.overview(slug, req.user.userId);
+  }
+
+  @Get("live-classes")
+  @ApiOperation({ summary: "Live classes of the learner's courses (join link only shortly before start)" })
+  live(@Param("slug") slug: string, @Query() q: LiveQueryDto, @Req() req: RequestWithUser) {
+    return this.dashboard.liveClasses(slug, req.user.userId, q.when ?? "upcoming");
+  }
+
+  @Get("assignments")
+  @ApiOperation({ summary: "Published assignments of the learner's courses with their own submission state" })
+  assignments(@Param("slug") slug: string, @Req() req: RequestWithUser) {
+    return this.dashboard.assignments(slug, req.user.userId);
+  }
+
+  @Get("quiz-results")
+  @ApiOperation({ summary: "The learner's quiz attempts (newest first)" })
+  quizResults(@Param("slug") slug: string, @Req() req: RequestWithUser) {
+    return this.dashboard.quizResults(slug, req.user.userId);
+  }
+
+  @Get("certificates")
+  @ApiOperation({ summary: "The learner's certificates with verify links" })
+  certificates(@Param("slug") slug: string, @Req() req: RequestWithUser) {
+    return this.dashboard.certificates(slug, req.user.userId);
+  }
+
+  @Get("orders")
+  @ApiOperation({ summary: "The learner's orders with invoices" })
+  orders(@Param("slug") slug: string, @Req() req: RequestWithUser) {
+    return this.dashboard.orders(slug, req.user.userId);
+  }
+
+  @Get("profile")
+  @ApiOperation({ summary: "The learner's profile" })
+  profile(@Param("slug") slug: string, @Req() req: RequestWithUser) {
+    return this.dashboard.profile(slug, req.user.userId);
+  }
+
+  @Patch("profile")
+  @ApiOperation({ summary: "Update name, phone, bio, country" })
+  updateProfile(@Param("slug") slug: string, @Body() dto: LearnerProfileDto, @Req() req: RequestWithUser) {
+    return this.dashboard.updateProfile(slug, req.user.userId, dto);
+  }
+
+  @Post("password")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: "Change password (current password required; workspace password policy applies)" })
+  changePassword(@Param("slug") slug: string, @Body() dto: LearnerPasswordDto, @Req() req: RequestWithUser) {
+    return this.dashboard.changePassword(slug, req.user.userId, dto.currentPassword, dto.newPassword);
   }
 }

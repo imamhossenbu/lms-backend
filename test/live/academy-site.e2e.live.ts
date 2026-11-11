@@ -167,7 +167,7 @@ const clickText = (page: Page, label: string) =>
     check("Sign out from the user menu", out.includes("Sign in") && !(await page.$('button[aria-haspopup="menu"]')));
     await page.goto(`${SITE}/my-courses`, { waitUntil: "networkidle2" });
     await until(async () => page.url(), (u) => u.includes("/login"));
-    check("signed out: My courses asks to sign in", page.url().includes("/login?next=%2Fmy-courses"), page.url());
+    check("signed out: My courses asks to sign in", page.url().includes("/login?next=%2Fdashboard"), page.url());
     await page.waitForSelector("#login-email", { timeout: 30000 });
     await page.type("#login-email", email);
     await page.type("#login-password", "wrong-pass");
@@ -176,7 +176,7 @@ const clickText = (page: Page, label: string) =>
     await page.$eval("#login-password", (e) => (e as HTMLInputElement).select());
     await page.type("#login-password", "Passw0rd!x");
     await page.click("button[type=submit]");
-    await until(async () => page.url(), (u) => u.endsWith("/my-courses"));
+    await until(async () => page.url(), (u) => u.includes("/dashboard?tab=courses"));
     const mc = await waitForText(page, free.title).then(() => safeText(page));
     check("wrong password refused, right one returns to My courses", mc.includes(paid.title) && mc.includes(free.title));
   } catch (err) {

@@ -15,6 +15,7 @@ import { AcademyCheckoutService } from "./learner/academy-checkout.service";
 import { LearnerAuthController, LearnerMeController } from "./learner/learner.controller";
 import { LearnerAuthService } from "./learner/learner-auth.service";
 import { LearnerPlayerService } from "./learner/learner-player.service";
+import { LearnerDashboardService } from "./learner/learner-dashboard.service";
 
 /**
  * Public data for each academy's own website (lms-academy-site, port 3003):
@@ -25,13 +26,14 @@ import { LearnerPlayerService } from "./learner/learner-player.service";
  * Learners (learner/):
  *   POST /academy/public/:slug/auth/register|verify|resend|login   learner accounts (STUDENT of that academy)
  *   /academy/:slug/me (JWT)   GET me, courses/:courseSlug/access, checkout/:courseSlug (quote), POST checkout, orders/:id,
- *                             learn/:courseSlug (player outline), learn/:courseSlug/lessons/:id (+ POST …/complete)
+ *                             learn/:courseSlug (player outline), learn/:courseSlug/lessons/:id (+ POST …/complete),
+ *                             dashboard, live-classes, assignments, quiz-results, certificates, orders, profile (GET|PATCH), POST password
  *   POST /academy/checkout/sslcommerz/success|fail|cancel|ipn   gateway callbacks → 303 to the academy site
  * Admin panel › Website (admin/): /admin/website GET|PATCH content, /admin/website/subscribers (+ export, :id PATCH|DELETE)
  */
 @Module({
   imports: [PrismaModule, WorkspaceSettingsModule, AuthModule, CommerceModule, InvoiceModule, EnrollmentModule],
   controllers: [PublicAcademyController, LearnerAuthController, LearnerMeController, AcademyCheckoutCallbackController, AdminWebsiteController],
-  providers: [AcademySiteService, LearnerAuthService, AcademyCheckoutService, MailService, AdminWebsiteService, LearnerPlayerService],
+  providers: [AcademySiteService, LearnerAuthService, AcademyCheckoutService, MailService, AdminWebsiteService, LearnerPlayerService, LearnerDashboardService],
 })
 export class AcademySiteModule {}

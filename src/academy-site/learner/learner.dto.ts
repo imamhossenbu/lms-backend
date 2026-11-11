@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim() : value);
 const lower = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim().toLowerCase() : value);
@@ -79,4 +79,54 @@ export class StartCheckoutDto {
   @IsString()
   @MaxLength(40)
   coupon?: string;
+}
+
+export class LearnerProfileDto {
+  @ApiProperty()
+  @Transform(trim)
+  @IsString()
+  @MinLength(2, { message: "Enter your full name" })
+  @MaxLength(80)
+  name!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(trim)
+  @Matches(/^$|^\+?[0-9 ()-]{7,20}$/, { message: "Enter a valid phone number" })
+  phone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(500, { message: "Keep your bio under 500 characters" })
+  bio?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(60)
+  country?: string;
+}
+
+export class LearnerPasswordDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty({ message: "Enter your current password" })
+  @MaxLength(100)
+  currentPassword!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8, { message: "Use at least 8 characters" })
+  @MaxLength(100)
+  newPassword!: string;
+}
+
+export class LiveQueryDto {
+  @ApiPropertyOptional({ enum: ["upcoming", "past"] })
+  @IsOptional()
+  @IsIn(["upcoming", "past"])
+  when?: "upcoming" | "past";
 }
