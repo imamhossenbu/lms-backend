@@ -50,6 +50,7 @@ import { QuizzesModule } from "./quizzes/quizzes.module";
 import { LiveClassesModule } from "./live-classes/live-classes.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { CertificatesModule } from "./certificates/certificates.module";
+import { AcademySiteModule } from "./academy-site/academy-site.module";
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { CertificatesModule } from "./certificates/certificates.module";
     LessonAccessModule,
     NotificationsModule,
     CertificatesModule,
+    AcademySiteModule,
   ],
   providers: [
     {
