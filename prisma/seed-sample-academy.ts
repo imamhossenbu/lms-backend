@@ -309,6 +309,7 @@ const SITE = {
     { question: "Can I study on my phone?", answer: "Yes. The website works on any phone, tablet or computer, and your progress is saved across devices." },
     { question: "What is the refund policy?", answer: "If a course isn't right for you, contact us within 7 days of purchase and before completing 30% of it for a full refund." },
   ],
+  officeHours: "Saturday – Thursday, 10:00 AM – 7:00 PM",
   newsletter: { enabled: true, title: "Get new courses & offers first", text: "One short email a month: new courses, free live classes and early-bird discounts. No spam, unsubscribe anytime." },
 };
 

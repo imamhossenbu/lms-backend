@@ -4,7 +4,7 @@ import { Throttle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ValidateDto } from "../common/auth-user";
 import { AcademySiteService } from "./academy-site.service";
-import { AcademyCoursesQueryDto, AcademyReviewsQueryDto, NewsletterDto, ResolveAcademyQueryDto } from "./dto/academy-query.dto";
+import { AcademyContactDto, AcademyCoursesQueryDto, AcademyReviewsQueryDto, NewsletterDto, ResolveAcademyQueryDto } from "./dto/academy-query.dto";
 
 /**
  * Unauthenticated, read-only data for each academy's public website (lms-academy-site). The site renders on the
@@ -67,5 +67,14 @@ export class PublicAcademyController {
     // Bots fill the hidden field: answer as if it worked, store nothing.
     if (dto.website) return { message: "You're subscribed! Watch your inbox for new courses and offers." };
     return this.academy.subscribe(slug, dto.email, dto.name ?? "", dto.source ?? "website", req.ip ?? "");
+  }
+
+  @Post(":slug/contact")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: "Website contact form: stored for Admin › Website › Messages and emailed to the support address" })
+  async contact(@Param("slug") slug: string, @Body() dto: AcademyContactDto, @Req() req: Request) {
+    if (dto.website) return { message: "Thanks! Your message has been sent — we'll get back to you soon." };
+    return this.academy.contact(slug, dto, req.ip ?? "");
   }
 }

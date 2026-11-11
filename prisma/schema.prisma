@@ -1391,6 +1391,7 @@ model Institution {
   couponRedemptions     SaasCouponRedemption[]
   academySite           AcademySite?
   newsletterSubscribers NewsletterSubscriber[]
+  contactMessages       AcademyContactMessage[]
 
   @@index([status])
   @@index([planId])
@@ -1952,4 +1953,25 @@ model NewsletterSubscriber {
   @@unique([institutionId, email])
   @@index([institutionId, createdAt])
   @@map("newsletter_subscribers")
+}
+
+/// Contact-form messages from an academy's website (Admin panel › Website › Messages).
+model AcademyContactMessage {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  name          String
+  email         String
+  phone         String      @default("")
+  /// COURSE | ENROLLMENT | PAYMENT | TECHNICAL | OTHER
+  topic         String
+  message       String
+  /// NEW | READ | REPLIED | ARCHIVED
+  status        String      @default("NEW")
+  ip            String      @default("")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([institutionId, status, createdAt])
+  @@map("academy_contact_messages")
 }

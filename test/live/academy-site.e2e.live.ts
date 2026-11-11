@@ -1,6 +1,6 @@
 /**
  * Browser E2E for an academy website (lms-academy-site on :3003, academy picked with ?academy=<slug>) against the
- * real API and the SSLCommerz SANDBOX: home + newsletter sign-up + catalogue search (URL state) + course page, Enroll → sign-up (zod
+ * real API and the SSLCommerz SANDBOX: home + newsletter sign-up + contact form + catalogue search (URL state) + course page, Enroll → sign-up (zod
  * errors) → emailed code → signed in → checkout, bad coupon error, coupon applied and kept on reload, pay with
  * the sandbox card + OTP → validated callback → result page "Payment successful", PAID order + enrollment + coupon
  * counted, My courses, "You're enrolled" on the course page, free course enrolment, sign out / sign back in.
@@ -55,6 +55,21 @@ const clickText = (page: Page, label: string) =>
     await until(() => safeText(page), (t) => t.includes("on the list"));
     const sub = await p.newsletterSubscriber.findFirst({ where: { institutionId: inst.id, email: `${tag}-news@example.com` } });
     check("newsletter: empty email refused, valid email subscribed from the home page", sub?.status === "SUBSCRIBED" && sub.source === "home");
+
+    // ---------------------------------------------------------------- contact form
+    await page.goto(`${SITE}/contact`, { waitUntil: "networkidle2" });
+    await page.waitForSelector("#contact-name");
+    await clickText(page, "Send message");
+    const cErr = await until(() => safeText(page), (t) => t.includes("Enter your name"));
+    check("contact form shows field errors", cErr.includes("Enter a valid email address") || cErr.includes("Enter your email address"));
+    await page.type("#contact-name", "Rumana Visitor");
+    await page.type("#contact-email", `${tag}-visitor@example.com`);
+    await clickText(page, "Payment");
+    await page.type("#contact-message", "Can I pay for the Figma course with bKash in two parts?");
+    await clickText(page, "Send message");
+    await until(() => safeText(page), (t) => t.includes("Message sent!"));
+    const msg = await p.academyContactMessage.findFirst({ where: { institutionId: inst.id, email: `${tag}-visitor@example.com` } });
+    check("contact message stored for the admin (topic, status NEW)", msg?.topic === "PAYMENT" && msg.status === "NEW" && msg.name === "Rumana Visitor");
 
     await page.goto(`${SITE}/courses`, { waitUntil: "networkidle2" });
     await page.type('input[aria-label="Search courses"]', "figma");
@@ -178,6 +193,7 @@ const clickText = (page: Page, label: string) =>
       await retry(() => p.order.deleteMany({ where: { id: { in: orders } } }));
       await retry(() => p.coupon.deleteMany({ where: { institutionId: { in: ids.insts } } }));
       await retry(() => p.newsletterSubscriber.deleteMany({ where: { institutionId: { in: ids.insts } } }));
+      await retry(() => p.academyContactMessage.deleteMany({ where: { institutionId: { in: ids.insts } } }));
     });
     await report(tag);
   }

@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { MailService } from "../auth/mail/mail.service";
 import type { Prisma } from "../../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
 import { toSiteContent } from "./site-content";
@@ -33,9 +34,12 @@ const PUBLISHED = "PUBLISHED";
  */
 @Injectable()
 export class AcademySiteService {
+  private readonly logger = new Logger(AcademySiteService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: WorkspaceSettingsReader,
+    private readonly mail: MailService,
   ) {}
 
   // ------------------------------------------------------------------ tenant
@@ -320,6 +324,25 @@ export class AcademySiteService {
       update: { status: "SUBSCRIBED", ...(name.trim() ? { name: name.trim().slice(0, 80) } : {}) },
     });
     return { message: "You're subscribed! Watch your inbox for new courses and offers." };
+  }
+
+  // ------------------------------------------------------------------ contact form
+
+  /** Stores a contact-form message and emails it to the academy's support address (best effort). */
+  async contact(slug: string, dto: { name: string; email: string; phone?: string; topic: string; message: string }, ip: string) {
+    const tenantId = await this.onlineTenant(slug);
+    await this.prisma.academyContactMessage.create({
+      data: { institutionId: tenantId, name: dto.name, email: dto.email, phone: dto.phone ?? "", topic: dto.topic, message: dto.message, ip: ip.slice(0, 64) },
+    });
+    const general = await this.settings.section(tenantId, "general");
+    if (general.supportEmail) {
+      const topic = dto.topic.charAt(0) + dto.topic.slice(1).toLowerCase();
+      const body = `${dto.message}\n\n— ${dto.name} <${dto.email}>${dto.phone ? ` · ${dto.phone}` : ""}`;
+      await this.mail
+        .sendAdminMessageEmail(general.supportEmail, `${general.platformName} team`, dto.name, `New website message: ${topic}`, body)
+        .catch((e: any) => this.logger.error(`Contact email to ${general.supportEmail} failed: ${e?.message ?? e}`));
+    }
+    return { message: "Thanks! Your message has been sent — we'll get back to you soon." };
   }
 
   // ------------------------------------------------------------------ reviews

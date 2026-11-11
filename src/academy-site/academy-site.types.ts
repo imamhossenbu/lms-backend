@@ -40,6 +40,8 @@ export interface AcademySiteContent {
   faqs: { question: string; answer: string }[];
   socials: { facebook: string; instagram: string; youtube: string; linkedin: string; tiktok: string };
   newsletter: { enabled: boolean; title: string; text: string };
+  /** Shown on the contact page, e.g. "Sat–Thu, 10:00 AM – 7:00 PM". */
+  officeHours: string;
 }
 
 export interface AcademyInstructorSummary {

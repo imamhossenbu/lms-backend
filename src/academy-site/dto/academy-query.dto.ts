@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
-import { IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from "class-validator";
+import { IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
 
 export const ACADEMY_COURSE_SORTS = ["popular", "newest", "rating", "priceAsc", "priceDesc"] as const;
 export type AcademyCourseSort = (typeof ACADEMY_COURSE_SORTS)[number];
@@ -95,6 +95,47 @@ export class NewsletterDto {
   @IsString()
   @MaxLength(30)
   source?: string;
+
+  @ApiPropertyOptional({ description: "Honeypot — leave empty" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
+}
+
+export const CONTACT_TOPICS = ["COURSE", "ENROLLMENT", "PAYMENT", "TECHNICAL", "OTHER"] as const;
+
+/** Academy website contact form. `website` is a honeypot. */
+export class AcademyContactDto {
+  @ApiPropertyOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(2, { message: "Enter your name" })
+  @MaxLength(80)
+  name!: string;
+
+  @ApiPropertyOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: "Enter a valid email address" })
+  @MaxLength(120)
+  email!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @Matches(/^$|^\+?[0-9 ()-]{7,20}$/, { message: "Enter a valid phone number" })
+  phone?: string;
+
+  @ApiPropertyOptional({ enum: CONTACT_TOPICS })
+  @IsIn(CONTACT_TOPICS, { message: "Choose a topic" })
+  topic!: (typeof CONTACT_TOPICS)[number];
+
+  @ApiPropertyOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10, { message: "Tell us a little more (at least 10 characters)" })
+  @MaxLength(2000, { message: "Message can be at most 2,000 characters" })
+  message!: string;
 
   @ApiPropertyOptional({ description: "Honeypot — leave empty" })
   @IsOptional()

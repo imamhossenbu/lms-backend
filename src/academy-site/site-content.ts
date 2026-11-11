@@ -33,5 +33,6 @@ export function toSiteContent(raw: unknown): AcademySiteContent {
       .slice(0, 20),
     socials: { facebook: url(socials.facebook), instagram: url(socials.instagram), youtube: url(socials.youtube), linkedin: url(socials.linkedin), tiktok: url(socials.tiktok) },
     newsletter: { enabled: news.enabled !== false, title: str(news.title, 80), text: str(news.text, 240) },
+    officeHours: str(c.officeHours, 120),
   };
 }
