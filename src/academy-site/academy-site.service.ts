@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "../../generated/prisma";
 import { PrismaService } from "../prisma/prisma.service";
+import { toSiteContent } from "./site-content";
 import { SAAS_ROOT_DOMAIN } from "../saas/saas.constants";
 import { WorkspaceSettingsReader } from "../workspace-settings/services/workspace-settings-reader.service";
 import type { AcademyCoursesQueryDto } from "./dto/academy-query.dto";
@@ -94,7 +95,7 @@ export class AcademySiteService {
 
   async profile(slug: string): Promise<AcademyProfile> {
     const inst = await this.institution(slug);
-    const settings = await this.settings.all(inst.id);
+    const [settings, siteRow] = await Promise.all([this.settings.all(inst.id), this.prisma.academySite.findUnique({ where: { institutionId: inst.id }, select: { content: true } })]);
     const base = {
       slug: inst.slug,
       name: settings.general.platformName || inst.name,
@@ -121,7 +122,7 @@ export class AcademySiteService {
         until: settings.maintenance.maintenanceUntil,
       },
     };
-    const empty = { stats: { courses: 0, students: 0, instructors: 0, lessons: 0, rating: 0, reviews: 0 }, categories: [] };
+    const empty = { stats: { courses: 0, students: 0, instructors: 0, lessons: 0, rating: 0, reviews: 0 }, categories: [], site: null };
     if (!ONLINE_STATUSES.has(inst.status)) return { available: false, ...base, ...empty };
 
     const where = this.publishedWhere(inst.id);
@@ -151,6 +152,7 @@ export class AcademySiteService {
       categories: categories
         .map((c) => ({ id: c.id, slug: c.slug, name: c.name, icon: c.icon, courses: c._count.courses }))
         .sort((a, b) => b.courses - a.courses),
+      site: siteRow ? toSiteContent(siteRow.content) : null,
     };
   }
 
@@ -304,6 +306,20 @@ export class AcademySiteService {
 
   async instructors(slug: string): Promise<AcademyInstructor[]> {
     return this.instructorList(await this.onlineTenant(slug));
+  }
+
+  // ------------------------------------------------------------------ newsletter
+
+  /** Newsletter sign-up (idempotent; a previous unsubscribe is re-activated). */
+  async subscribe(slug: string, email: string, name: string, source: string, ip: string) {
+    const tenantId = await this.onlineTenant(slug);
+    const clean = email.trim().toLowerCase();
+    await this.prisma.newsletterSubscriber.upsert({
+      where: { institutionId_email: { institutionId: tenantId, email: clean } },
+      create: { institutionId: tenantId, email: clean, name: name.trim().slice(0, 80), source: source.slice(0, 30) || "website", ip: ip.slice(0, 64) },
+      update: { status: "SUBSCRIBED", ...(name.trim() ? { name: name.trim().slice(0, 80) } : {}) },
+    });
+    return { message: "You're subscribed! Watch your inbox for new courses and offers." };
   }
 
   // ------------------------------------------------------------------ reviews

@@ -1,6 +1,6 @@
 /**
  * Browser E2E for an academy website (lms-academy-site on :3003, academy picked with ?academy=<slug>) against the
- * real API and the SSLCommerz SANDBOX: home + catalogue search (URL state) + course page, Enroll → sign-up (zod
+ * real API and the SSLCommerz SANDBOX: home + newsletter sign-up + catalogue search (URL state) + course page, Enroll → sign-up (zod
  * errors) → emailed code → signed in → checkout, bad coupon error, coupon applied and kept on reload, pay with
  * the sandbox card + OTP → validated callback → result page "Payment successful", PAID order + enrollment + coupon
  * counted, My courses, "You're enrolled" on the course page, free course enrolment, sign out / sign back in.
@@ -44,6 +44,17 @@ const clickText = (page: Page, label: string) =>
     await page.goto(`${SITE}/?academy=${inst.slug}`, { waitUntil: "networkidle2", timeout: 90000 });
     const home = await waitForText(page, paid.title).then(() => safeText(page));
     check("home shows the academy and its published courses", home.includes(inst.name) && home.includes(paid.title) && home.includes(free.title));
+
+    // ---------------------------------------------------------------- newsletter
+    const news = 'section input[aria-label="Email address"]';
+    await page.click(`${news}`);
+    await page.keyboard.press("Enter");
+    await until(() => safeText(page), (t) => t.includes("Enter your email address"));
+    await page.type(news, `${tag}-news@example.com`);
+    await page.keyboard.press("Enter");
+    await until(() => safeText(page), (t) => t.includes("on the list"));
+    const sub = await p.newsletterSubscriber.findFirst({ where: { institutionId: inst.id, email: `${tag}-news@example.com` } });
+    check("newsletter: empty email refused, valid email subscribed from the home page", sub?.status === "SUBSCRIBED" && sub.source === "home");
 
     await page.goto(`${SITE}/courses`, { waitUntil: "networkidle2" });
     await page.type('input[aria-label="Search courses"]', "figma");
@@ -166,6 +177,7 @@ const clickText = (page: Page, label: string) =>
       await retry(() => p.invoice.deleteMany({ where: { orderId: { in: orders } } }));
       await retry(() => p.order.deleteMany({ where: { id: { in: orders } } }));
       await retry(() => p.coupon.deleteMany({ where: { institutionId: { in: ids.insts } } }));
+      await retry(() => p.newsletterSubscriber.deleteMany({ where: { institutionId: { in: ids.insts } } }));
     });
     await report(tag);
   }

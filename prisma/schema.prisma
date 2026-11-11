@@ -9,16 +9,16 @@ datasource db {
 
 // --- User Management ---
 model User {
-  id                String    @id @default(uuid())
-  name              String
-  email             String    @unique
-  password          String
-  phone             String?
-  avatar            String?
-  role              String    @default("STUDENT")
-  status            String    @default("PENDING")
-  verificationToken String?   @unique
-  lastLoginAt       DateTime?
+  id                  String    @id @default(uuid())
+  name                String
+  email               String    @unique
+  password            String
+  phone               String?
+  avatar              String?
+  role                String    @default("STUDENT")
+  status              String    @default("PENDING")
+  verificationToken   String?   @unique
+  lastLoginAt         DateTime?
   /// Settings › Security › Login protection: wrong passwords in a row, and the lock they caused.
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
@@ -83,20 +83,20 @@ model User {
 
 // --- Courses & Learning ---
 model Category {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String
+  id            String     @id @default(uuid())
+  name          String
+  slug          String
   /// Tenant (null = legacy single-tenant workspace). Slugs are unique per workspace.
   institutionId String?
-  description String?
-  icon        String?
-  status      String
+  description   String?
+  icon          String?
+  status        String
   /// Parent category (null = top level). One level deep: a sub-category can't have children.
-  parentId    String?
-  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children    Category[] @relation("CategoryTree")
-  createdAt   DateTime   @default(now())
-  courses     Course[]
+  parentId      String?
+  parent        Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children      Category[] @relation("CategoryTree")
+  createdAt     DateTime   @default(now())
+  courses       Course[]
 
   @@unique([institutionId, slug])
   @@index([institutionId])
@@ -1384,11 +1384,13 @@ model Institution {
   paymentBrand        String?
   paymentLast4        String?
 
-  customDomain      CustomDomain?
-  invoices          SaasInvoice[]
-  events            SaasEvent[]
-  users             User[]
-  couponRedemptions SaasCouponRedemption[]
+  customDomain          CustomDomain?
+  invoices              SaasInvoice[]
+  events                SaasEvent[]
+  users                 User[]
+  couponRedemptions     SaasCouponRedemption[]
+  academySite           AcademySite?
+  newsletterSubscribers NewsletterSubscriber[]
 
   @@index([status])
   @@index([planId])
@@ -1828,19 +1830,19 @@ model MarketingLead {
 /// Marketing website › testimonials, managed by the platform owner in the Owner Console. Only published
 /// ones are served (GET /saas/public/testimonials), in `order`.
 model Testimonial {
-  id           String   @id @default(uuid())
-  quote        String
-  name         String
+  id          String   @id @default(uuid())
+  quote       String
+  name        String
   /// e.g. "Director, LearnZone Academy".
-  role         String   @default("")
+  role        String   @default("")
   /// Optional photo URL (uploaded via the console); initials are shown without one.
-  avatarUrl    String   @default("")
-  isPublished  Boolean  @default(false)
+  avatarUrl   String   @default("")
+  isPublished Boolean  @default(false)
   /// Shown as the highlighted (orange) card.
-  featured     Boolean  @default(false)
-  order        Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  featured    Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([isPublished, order])
   @@map("testimonials")
@@ -1881,40 +1883,73 @@ model BlogPost {
 /// A plan purchase started on the marketing website's /checkout and paid through SSLCommerz. The academy and its
 /// admin are created only after the gateway payment is validated server-to-server.
 model SaasCheckout {
-  id            String    @id @default(uuid())
+  id              String    @id @default(uuid())
   /// Our reference sent to the gateway as tran_id (also the public lookup key for the result page).
-  tranId        String    @unique
-  planId        String
-  cycle         String
+  tranId          String    @unique
+  planId          String
+  cycle           String
   /// Charged amounts (USD): plan price + tax for the chosen country.
-  subtotal      Float
-  tax           Float
-  total         Float
-  currency      String    @default("USD")
+  subtotal        Float
+  tax             Float
+  total           Float
+  currency        String    @default("USD")
   /// PENDING → PAID | FAILED | CANCELLED
-  status        String    @default("PENDING")
+  status          String    @default("PENDING")
   /// Sign-up details (password stored as a bcrypt hash only).
-  name          String
-  email         String
-  phone         String    @default("")
-  passwordHash  String
+  name            String
+  email           String
+  phone           String    @default("")
+  passwordHash    String
   institutionName String
   institutionType String
-  country       String
-  slug          String
+  country         String
+  slug            String
   /// Set once the academy is created after a validated payment.
-  institutionId String?
+  institutionId   String?
   /// Gateway details from the validation API.
-  valId         String    @default("")
-  bankTranId    String    @default("")
-  cardType      String    @default("")
+  valId           String    @default("")
+  bankTranId      String    @default("")
+  cardType        String    @default("")
   /// Why it failed (shown on the result page).
-  error         String    @default("")
-  paidAt        DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  error           String    @default("")
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([status, createdAt])
   @@index([email])
   @@map("saas_checkouts")
+}
+
+/// Content of an academy's public website (lms-academy-site) that the admin edits: hero text, mission,
+/// mobile app links, FAQ, social links, newsletter copy. Shape: src/academy-site/academy-site.types.ts AcademySiteContent.
+model AcademySite {
+  id            String      @id @default(uuid())
+  institutionId String      @unique
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  content       Json
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("academy_sites")
+}
+
+/// Newsletter sign-ups from an academy's website (one row per email per academy).
+model NewsletterSubscriber {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  email         String
+  name          String      @default("")
+  /// SUBSCRIBED | UNSUBSCRIBED
+  status        String      @default("SUBSCRIBED")
+  /// Where the form was: "home" | "footer" | …
+  source        String      @default("website")
+  ip            String      @default("")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([institutionId, email])
+  @@index([institutionId, createdAt])
+  @@map("newsletter_subscribers")
 }

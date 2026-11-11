@@ -28,6 +28,18 @@ export interface AcademyProfile {
   maintenance: { enabled: boolean; message: string; until: string };
   stats: { courses: number; students: number; instructors: number; lessons: number; rating: number; reviews: number };
   categories: AcademyCategory[];
+  /** Admin-edited website content; null until the academy sets it up (those sections stay hidden). */
+  site: AcademySiteContent | null;
+}
+
+/** Stored in academy_sites.content (JSON). Every field optional; empty strings mean "not set". */
+export interface AcademySiteContent {
+  hero: { title: string; subtitle: string } | null;
+  mission: { why: string; what: string; how: string; imageUrl: string } | null;
+  app: { title: string; text: string; appStoreUrl: string; playStoreUrl: string; screenshotUrl: string } | null;
+  faqs: { question: string; answer: string }[];
+  socials: { facebook: string; instagram: string; youtube: string; linkedin: string; tiktok: string };
+  newsletter: { enabled: boolean; title: string; text: string };
 }
 
 export interface AcademyInstructorSummary {

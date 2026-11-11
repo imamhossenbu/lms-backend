@@ -28,3 +28,33 @@ describe("academy-site mapper", () => {
     expect(card.instructor.headline).toBe("Design");
   });
 });
+
+import { toSiteContent } from "./site-content";
+
+describe("academy website content", () => {
+  it("drops unknown keys, trims, keeps https links only and nulls empty blocks", () => {
+    const c = toSiteContent({
+      _sample: true,
+      evil: "<script>",
+      hero: { title: "  Build_ Skills  ", subtitle: "" },
+      mission: { why: "", what: "", how: "" },
+      app: { appStoreUrl: "javascript:alert(1)", playStoreUrl: "" },
+      faqs: [{ question: "Q?", answer: "A." }, { question: "no answer" }, "junk"],
+      socials: { facebook: "https://facebook.com/x", youtube: "http://insecure.example" },
+      newsletter: { title: "Hi" },
+    });
+    expect(c.hero).toEqual({ title: "Build_ Skills", subtitle: "" });
+    expect(c.mission).toBeNull();
+    expect(c.app).toBeNull();
+    expect(c.faqs).toEqual([{ question: "Q?", answer: "A." }]);
+    expect(c.socials.facebook).toBe("https://facebook.com/x");
+    expect(c.socials.youtube).toBe("");
+    expect(c.newsletter).toEqual({ enabled: true, title: "Hi", text: "" });
+    expect(JSON.stringify(c)).not.toContain("evil");
+  });
+
+  it("handles missing / non-object content", () => {
+    expect(toSiteContent(null).faqs).toEqual([]);
+    expect(toSiteContent("x").hero).toBeNull();
+  });
+});

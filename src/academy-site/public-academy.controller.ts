@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from "@nestjs/common";
+import type { Request } from "express";
 import { Throttle } from "@nestjs/throttler";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ValidateDto } from "../common/auth-user";
 import { AcademySiteService } from "./academy-site.service";
-import { AcademyCoursesQueryDto, AcademyReviewsQueryDto, ResolveAcademyQueryDto } from "./dto/academy-query.dto";
+import { AcademyCoursesQueryDto, AcademyReviewsQueryDto, NewsletterDto, ResolveAcademyQueryDto } from "./dto/academy-query.dto";
 
 /**
  * Unauthenticated, read-only data for each academy's public website (lms-academy-site). The site renders on the
@@ -56,5 +57,15 @@ export class PublicAcademyController {
   @ApiOperation({ summary: "Top approved reviews across the academy's published courses" })
   reviews(@Param("slug") slug: string, @Query() q: AcademyReviewsQueryDto) {
     return this.academy.reviews(slug, q.limit ?? 6);
+  }
+
+  @Post(":slug/newsletter")
+  @HttpCode(200)
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @ApiOperation({ summary: "Newsletter sign-up for this academy (idempotent; honeypot `website` must be empty)" })
+  async newsletter(@Param("slug") slug: string, @Body() dto: NewsletterDto, @Req() req: Request) {
+    // Bots fill the hidden field: answer as if it worked, store nothing.
+    if (dto.website) return { message: "You're subscribed! Watch your inbox for new courses and offers." };
+    return this.academy.subscribe(slug, dto.email, dto.name ?? "", dto.source ?? "website", req.ip ?? "");
   }
 }

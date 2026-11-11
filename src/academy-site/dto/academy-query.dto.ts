@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from "class-validator";
 
 export const ACADEMY_COURSE_SORTS = ["popular", "newest", "rating", "priceAsc", "priceDesc"] as const;
 export type AcademyCourseSort = (typeof ACADEMY_COURSE_SORTS)[number];
@@ -74,4 +74,31 @@ export class AcademyReviewsQueryDto {
   @Min(1)
   @Max(24)
   limit?: number;
+}
+
+/** Newsletter sign-up. `website` is a honeypot: real visitors never fill it. */
+export class NewsletterDto {
+  @ApiPropertyOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim().toLowerCase() : value))
+  @IsEmail({}, { message: "Enter a valid email address" })
+  @MaxLength(120)
+  email!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  name?: string;
+
+  @ApiPropertyOptional({ description: "home | footer | about …" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  source?: string;
+
+  @ApiPropertyOptional({ description: "Honeypot — leave empty" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  website?: string;
 }
